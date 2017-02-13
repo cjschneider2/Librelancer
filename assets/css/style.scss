@@ -66,6 +66,11 @@ th, td { text-align: left; padding: 3px 4px; border: 1px solid #aaa; }
 	margin-right: 0;
 }
 
+.wrapper {
+	width: 100%;
+	max-width: 1020px;
+	min-width: 640px;
+}
 @media screen and (min-width: 50em) {
 	.photo-gallery a {
 		width: calc(25% - 6px);
