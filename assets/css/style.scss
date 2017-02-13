@@ -73,7 +73,11 @@ th, td { text-align: left; padding: 3px 4px; border: 1px solid #aaa; }
 }
 
 html, body {
-	background-image: url(../images/checker.png);
+	background-color: rgb(32, 32, 32);
+	background-image: url(../images/background_iota.jpg);
+	background-repeat: no-repeat;
+	background-size: cover;
+	background-attachment: fixed;
 }
 
 @media screen and (min-width: 50em) {
