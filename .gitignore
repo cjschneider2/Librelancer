@@ -4,6 +4,11 @@ obj/
 [Dd]ebug/
 [Rr]elease/
 packages/
+_site/
+
+# Github pages
+Gemfile
+Gemfile.lock
 
 # Visual Studio Profiling
 *.psess
