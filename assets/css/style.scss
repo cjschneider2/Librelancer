@@ -16,6 +16,9 @@ header p {
 	color: #a2b6c7;
 }
 
+header ul li { border-right: none; }
+header ul { background: #084f96; }
+
 nav ul {
 	display: inline;
 	margin: 0;
