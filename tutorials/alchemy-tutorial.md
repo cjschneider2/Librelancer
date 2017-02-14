@@ -3,9 +3,12 @@ title: Alchemy Tutorial
 layout: default
 ---
 
+* Do not remove this line (it will not be displayed)
+{:toc}
+
 # Alchemy
 
-##### Author: Treewyrm
+_**Author: Treewyrm**_
 
 *WIP: Still being converted to online format*
 
@@ -227,7 +230,7 @@ In THN scripts this parameter can be controlled and animated by `START_PSYS_PROP
 
 ### Easing types
 
-#### _type attribute for transitions_
+_**type attribute for transitions**_
 `<float type="4">`
 
 |Value|Type|Graph|Notes|
@@ -330,7 +333,7 @@ Dummy node is defined only in effect node list and never in `<AlchemyNodeLibrary
 
 ### Cube Emitter
 
-#### _(FxCubeEmitter)_
+_**(FxCubeEmitter)**_
 
 Cube emitter is a simple box shape defined by width, length and depth that has a direction. Pressure applied to particles will throw them at a direction limited between `CubeEmitter_MinSpread` and `CubeEmitter_MaxSpread` angles.
 
@@ -344,7 +347,7 @@ Cube emitter is a simple box shape defined by width, length and depth that has a
 
 ### Sphere Emitter
 
-#### _(FxSphereEmitter)_
+_**(FxSphereEmitter)**_
 
 Sphere emitter generates particles within a sphere shape defined by `SphereEmitter_MaxRadius`. If you wish it to be hollow set `SphereEmitter_MinRadius` to a value above 0 and below or equal to `SphereEmitter_MaxRadius`.
 
@@ -359,7 +362,7 @@ A positive pressure value applied to particles will throw them outwards while ne
 
 ### Cone Emitter
 
-#### _(FxConeEmitter)_
+_**(FxConeEmitter)**_
 
 Sphere emitter subset. Cone emitter is defined by sphere radius and cone inner and outer angles. Pressure vectors are the same as with sphere emitter.
 
@@ -380,13 +383,13 @@ A common example would be volcanic eruption effect at one of the main menu backg
 
 ### Basic Appearance
 
-#### _(FxBasicAppearance)_
+_**(FxBasicAppearance)**_
 
 A flat sprite that is always directed towards you.
 
 ### Directional Appearance
 
-#### _(FxRectAppearance)_
+_**(FxRectAppearance)**_
 
 Similar to basic particle but its normal however is pointing towards the center of the screen.
 
@@ -394,7 +397,7 @@ This type of particles is often used to create various ray effects
 
 ### Perpendicular Appearance
 
-#### _(FxPerpAppearance)_
+_**(FxPerpAppearance)**_
 
 Similar as basic particle this one however is entirely flat.
 
@@ -404,7 +407,7 @@ Use node transformation scaling to adjust square length and width.
 
 ### Beam Appearance
 
-#### _(FLBeamAppearance)_
+_**(FLBeamAppearance)**_
 
 As the name implies it is typically used for beam effects; however what this type does is connecting particles with two cross planes. Beam particle is used for various beam effects, contrails, and in lightning effect at Tekagi’s Arch 
 
@@ -412,14 +415,14 @@ As the name implies it is typically used for beam effects; however what this typ
 
 ### Mesh Appearance
 
-#### _(FxMeshAppearance)_
+_**(FxMeshAppearance)**_
 
 *Unimplemented in Freelancer and Librelancer*
 
 
 ### Effect Appearance
 
-#### _(FxParticleAppearance)_
+_**(FxParticleAppearance)**_
 
 Composite effect particle provides no visual effect on its own, instead it uses other effects: one during particle life defined by `ParticleApp_LifeName` and `ParticleApp_DeathName` is shown when it dies. This particle becomes the invisible object itself “carrying” effect assigned to `ParticleApp_LifeName`.
 
@@ -427,38 +430,38 @@ Composite particles can create complex cascading effects, but be careful not to 
 
 ### Radial Field
 
-#### _(FxRadialField)_
+_**(FxRadialField)**_
 
 Spherical field defined by `RadialField_Radius` it either attracts or detracts particles caught within. 
 
 ### Air Field
 
-#### _(FxAirField)_
+_**(FxAirField)**_
 
 It has no dimension properties and simply affects all particles paired to it. Air field does not accelerate particles over time as with gravity field, instead they move at a constant speed.
 
 ### Turbulence Field
 
-#### _(FxTurbulenceField)_
+_**(FxTurbulenceField)**_
 
 It has no dimension properties and simply affects all particles paired to it. Turbulence applies randomized force vector to particles defined by its `TurbulenceField_Magnitude` and frequency (hits/sec) of `TurbulenceField_Approach` properties. This creates shaking effect.
 
 ### Gravity Field
 
-#### _(FxGravityField)_
+_**(FxGravityField)**_
 
 Like turbulence field it has no dimensions and similarly applied to all particles paired to it. Gravity applies constant vector to particles defined by its. Vector direction can be controlled by rotating node, gravity value can also be a negative number.
 Emitters provide initial push through `Emitter_Pressure` property and particles continue at a constant speed but gravity field applies force constantly and accelerates particles.
 
 ### Collision Field
 
-#### _(FxCollideField)_
+_**(FxCollideField)**_
 
 Acting as invisible flat wall defined by its `CollideField_Width` and `CollideField_Height` properties collision field prevents particles from passing through. Additionally it may deflect particles by providing positive value to `CollideField_Reflectivity`.
 
 ### Dust Field
 
-#### _(FLDustField)_
+_**(FLDustField)**_
 
 *TODO: Needs test to see what it actually does*
 

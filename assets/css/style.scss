@@ -88,6 +88,28 @@ html, body {
 	font-weight: 400; 
 }
 
+ul#markdown-toc:before {
+	content: 'Contents';
+	color: black;
+	font-weight: bold;
+	font-size: 1.2em;
+}
+ul#markdown-toc {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    float: right;
+    background: #e6e6e6;
+    padding: 3px;
+    border: 1px solid;
+    text-align: center;
+}
+
+ul#markdown-toc li ul {
+    list-style-type: square;
+    text-align: left;
+}
+
 @media screen and (min-width: 50em) {
 	.photo-gallery a {
 		width: calc(25% - 6px);
