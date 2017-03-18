@@ -1,5 +1,5 @@
 ---
 layout: screenshot_gallery
 title: Screenshots
-navigation_weight: 3
+navigation_weight: 4
 ---

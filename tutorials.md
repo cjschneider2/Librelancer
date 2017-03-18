@@ -1,7 +1,7 @@
 ---
 title: Tutorials
 layout: default
-navigation_weight: 2
+navigation_weight: 3
 ---
 
 Here is a WIP collection of modding tutorials.
