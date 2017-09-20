@@ -7,6 +7,9 @@ header {
 	background: url('../images/space1.png');
 }
 
+code, pre {
+	font-family: Monaco, Bitstream Vera Sans Mono, Lucida Console, Terminal, monospace !important;
+}
 header h1 {
 	color: #0099CC;
 	text-shadow: rgba(0, 0, 0, 0.75) 0 1px 0;
