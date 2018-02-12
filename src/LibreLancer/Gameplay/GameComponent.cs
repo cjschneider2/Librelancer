@@ -14,6 +14,7 @@
  * the Initial Developer. All Rights Reserved.
  */
 using System;
+using LibreLancer.Physics;
 namespace LibreLancer
 {
 	public class GameComponent
@@ -29,10 +30,10 @@ namespace LibreLancer
 		public virtual void FixedUpdate(TimeSpan time)
 		{
 		}
-		public virtual void Register(SystemRenderer renderer, Jitter.World physics)
+		public virtual void Register(PhysicsWorld physics)
 		{
 		}
-		public virtual void Unregister()
+		public virtual void Unregister(PhysicsWorld physics)
 		{
 		}
 	}

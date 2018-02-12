@@ -30,7 +30,7 @@ namespace LibreLancer.Utf
 
         private Matrix4 currentTransform = Matrix4.Identity;
 
-        public override Matrix4 Transform { get { return internalGetTransform(currentTransform * Rotation * Matrix4.CreateTranslation(Origin + Offset)); } }
+		public override Matrix4 Transform { get { return internalGetTransform((Rotation * currentTransform) * Matrix4.CreateTranslation(Origin + Offset)); } }
 
         public RevConstruct(BinaryReader reader, ConstructCollection constructs)
             : base(reader, constructs)
@@ -54,11 +54,11 @@ namespace LibreLancer.Utf
 			newc.constructs = newcol;
 			return newc;
 		}
-
+        public float Current = 0;
         public override void Update(float distance)
         {
-			Vector3 currentRotation = AxisRotation * MathHelper.Clamp(distance, Min, Max);
-            currentTransform = Matrix4.CreateRotationX(currentRotation.X) * Matrix4.CreateRotationY(currentRotation.Y) * Matrix4.CreateRotationZ(currentRotation.Z);
+            Current = MathHelper.Clamp(distance, Min, Max);
+			currentTransform = Matrix4.CreateFromAxisAngle(AxisRotation, Current);
         }
     }
 }

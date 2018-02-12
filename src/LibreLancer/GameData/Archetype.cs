@@ -14,14 +14,16 @@
  * the Initial Developer. All Rights Reserved.
  */
 using System;
-
+using System.Collections.Generic;
 namespace LibreLancer.GameData
 {
 	public class Archetype
 	{
 		public IDrawable Drawable;
 		//HACK: remove later
-		public string ArchetypeName; 
+		public string ArchetypeName;
+		public List<DockSphere> DockSpheres = new List<DockSphere>();
+		public float[] LODRanges;
 		public Archetype ()
 		{
 		}

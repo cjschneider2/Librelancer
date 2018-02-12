@@ -1,13 +1,11 @@
 ﻿using System;
-using Jitter;
-using Jitter.LinearMath;
 using LibreLancer.Vertices;
 namespace LibreLancer
 {
-	public class PhysicsDebugRenderer : IDebugDrawer
+	public class PhysicsDebugRenderer :  IDisposable, Physics.IDebugRenderer
 	{
 		public Color4 Color = Color4.Red;
-		const int MAX_LINES = 50000;
+		const int MAX_LINES = 200000;
 		VertexPositionColor[] lines = new VertexPositionColor[MAX_LINES * 2];
 		VertexBuffer linebuffer;
 		int lineVertices = 0;
@@ -28,22 +26,26 @@ namespace LibreLancer
 			lineVertices = 0;	
 		}
 
-		public void DrawLine(JVector start, JVector end)
+		public void DrawLine(Vector3 start, Vector3 end)
 		{
-			DrawLineInternal(start.ToOpenTK(), end.ToOpenTK());
+            DrawLineInternal(start, end, Color);
 		}
 
-		public void DrawPoint(JVector pos)
+        public void DrawLine(Vector3 start, Vector3 end, Color4 color)
+        {
+            DrawLineInternal(start, end, color);
+        }
+		public void DrawPoint(Vector3 pos)
 		{
-			DrawPointInternal(pos.ToOpenTK());
+			DrawPointInternal(pos);
 		}
 
-		public void DrawTriangle(JVector pos1, JVector pos2, JVector pos3)
+		public void DrawTriangle(Vector3 pos1, Vector3 pos2, Vector3 pos3)
 		{
-			DrawTriangleInternal(pos1.ToOpenTK(), pos2.ToOpenTK(), pos3.ToOpenTK());
+			DrawTriangleInternal(pos1, pos2, pos3);
 		}
 
-		void DrawLineInternal(Vector3 start, Vector3 end)
+        void DrawLineInternal(Vector3 start, Vector3 end, Color4 color)
 		{
 			if ((lineVertices * 2) + 1 >= MAX_LINES)
 			{
@@ -61,9 +63,9 @@ namespace LibreLancer
 
 		void DrawTriangleInternal(Vector3 pos1, Vector3 pos2, Vector3 pos3)
 		{
-			DrawLineInternal(pos1, pos2);
-			DrawLineInternal(pos1, pos3);
-			DrawLineInternal(pos3, pos2);
+            DrawLineInternal(pos1, pos2, Color);
+            DrawLineInternal(pos1, pos3, Color);
+			DrawLineInternal(pos3, pos2, Color);
 		}
 
 		public void Render()
@@ -79,6 +81,11 @@ namespace LibreLancer
 			linebuffer.Draw(PrimitiveTypes.LineList, lineVertices / 2);
 			rstate.Cull = true;
 			rstate.DepthEnabled = true;
+		}
+
+		public void Dispose()
+		{
+			linebuffer.Dispose();
 		}
 	}
 }

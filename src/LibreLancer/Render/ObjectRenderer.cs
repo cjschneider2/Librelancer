@@ -18,10 +18,31 @@ namespace LibreLancer
 {
 	public abstract class ObjectRenderer
 	{
+        public string Name;
 		public abstract void Update(TimeSpan time, Vector3 position, Matrix4 transform);
 		public abstract void Draw(ICamera camera, CommandBuffer commands, SystemLighting lights, NebulaRenderer nr);
-		public abstract void Register(SystemRenderer renderer);
-		public abstract void Unregister();
+		public virtual void DepthPrepass(ICamera camera, RenderState rstate) { }
+		//Rendering Parameters
+		public bool LitAmbient = true;
+		public bool LitDynamic = true;
+		public bool NoFog = false;
+		public float[] LODRanges;
+        public float InheritCull = float.MinValue;
+
+		public virtual bool OutOfView(ICamera camera)
+		{
+			return true;
+		}
+
+        public virtual bool PrepareRender(ICamera camera, NebulaRenderer nr, SystemRenderer sys)
+		{
+            return false;
+		}
+
+        public override string ToString()
+        {
+            return Name ?? GetType().Name;
+        }
 	}
 }
 

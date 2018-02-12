@@ -203,10 +203,28 @@ namespace LibreLancer
 				rl.Kind = LightKind.Point;
 				rl.Color = Nebula.DynamicLightningColor;
 				rl.Position = dynamicLightningPos;
-				rl.Attenuation = new Vector4(1, 0, 0.0000055f, 0);
+				rl.Attenuation = new Vector3(1, 0, 0.0000055f);
 				rl.Range = (int)Nebula.FogRange.Y;
 				lightning = rl;
 			}
+		}
+
+		public bool DoLightning(out PointLight lt)
+		{
+			lt = new PointLight();
+			if (dynLightningActive)
+			{
+				lt.Position = new Vector4(dynamicLightningPos, 1);
+				lt.ColorRange = new Vector4(
+					Nebula.DynamicLightningColor.R,
+					Nebula.DynamicLightningColor.G,
+					Nebula.DynamicLightningColor.B,
+					Nebula.FogRange.Y
+				);
+				lt.Attenuation = new Vector4(1, 0, 0.0000055f, 0);
+				return true;
+			}
+			return false;
 		}
 
 		ExclusionZone GetExclusion(Vector3 position)
@@ -267,7 +285,7 @@ namespace LibreLancer
 			}
 			//Render
 			l0.Update(camera, TimeSpan.Zero);
-			l0.DrawBuffer(buffer, world, Lighting.Empty, null);
+			l0.DrawBuffer(buffer, world, ref Lighting.Empty, null);
 		}
         static Shader _puffringsh;
 		static int _ptex0;
@@ -459,6 +477,7 @@ namespace LibreLancer
 
 		void RenderFill(CommandBuffer buffer, bool inside)
 		{
+			if (Nebula.ExteriorFill == null) return;
 			Vector3 sz = Vector3.Zero;
 			//Only render ellipsoid and sphere exteriors
 			if (Nebula.Zone.Shape is ZoneEllipsoid)

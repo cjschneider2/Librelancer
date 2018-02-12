@@ -88,10 +88,10 @@ namespace LibreLancer.Fx
 			}
 		}
 
-		public override void Draw(ref Particle particle, float globaltime, ParticleEffect effect, ResourceManager res, Billboards billboards, ref Matrix4 transform, float sparam)
+		public override void Draw(ref Particle particle, float globaltime, NodeReference reference, ResourceManager res, Billboards billboards, ref Matrix4 transform, float sparam)
 		{
 			var time = particle.TimeAlive / particle.LifeSpan;
-			var node_tr = GetTranslation(effect, transform, sparam, time);
+			var node_tr = GetTranslation(reference, transform, sparam, time);
 
 			var p = node_tr.Transform(particle.Position);
 			Texture2D tex;
@@ -108,7 +108,7 @@ namespace LibreLancer.Fx
 				tr,
 				bl,
 				br,
-				Rotate.GetValue(sparam, time),
+                Rotate == null ? 0f : MathHelper.DegreesToRadians(Rotate.GetValue(sparam, time)),
 				SortLayers.OBJECT,
 				BlendInfo
 			);
@@ -143,7 +143,7 @@ namespace LibreLancer.Fx
 			if (_tex == null && _frame == null && _tex2D != null)
 			{
 				if (_tex2D == null || _tex2D.IsDisposed)
-					_tex2D = (Texture2D)res.FindTexture(Texture);
+					_tex2D = res.FindTexture(Texture) as Texture2D;
 				tex2d = _tex2D;
 			}
 			else if (_tex == null)
@@ -152,21 +152,22 @@ namespace LibreLancer.Fx
 					_tex2D = (Texture2D)res.FindTexture(_tex.Texture);
 				else if (res.TryGetFrameAnimation(Texture, out _frame))
 				{
-					_tex2D = (Texture2D)res.FindTexture(Texture + "_0");
+					_tex2D = res.FindTexture(Texture + "_0") as Texture2D;
 				}
 				else
 				{
-					_tex2D = (Texture2D)res.FindTexture(Texture);
+					_tex2D = res.FindTexture(Texture) as Texture2D;
 				}
 			}
 			if (_tex2D == null || _tex2D.IsDisposed)
 			{
 				if (_frame == null)
-					_tex2D = (Texture2D)res.FindTexture(_tex.Texture);
+					_tex2D = res.FindTexture(_tex == null ? Texture : _tex.Texture) as Texture2D;
 				else
-					_tex2D = (Texture2D)res.FindTexture(Texture + "_0");
+					_tex2D = res.FindTexture(Texture + "_0") as Texture2D;
 			}
 			tex2d = _tex2D;
+			if (tex2d == null) tex2d = (Texture2D)res.FindTexture(ResourceManager.WhiteTextureName);
 			//Shape?
 			if (_tex != null)
 			{

@@ -43,7 +43,7 @@ namespace LibreLancer
 
 		//Types where internal representations match
 		static Type[] workingTypes = new Type[] {
-			typeof(LightTypes)
+			typeof(LightTypes), typeof(FogModes)
 		};
 
 		//WIP enums
@@ -55,9 +55,37 @@ namespace LibreLancer
 					return AttachFlags.Position | AttachFlags.Orientation;
 				case (2 | 4 | 8):
 					return AttachFlags.Position | AttachFlags.Orientation | AttachFlags.LookAt;
+				case 2:
+					return AttachFlags.Position;
+				case 4:
+					return AttachFlags.Orientation;
+				case (2 | 4 | 32):
+					return AttachFlags.Position | AttachFlags.Orientation | AttachFlags.EntityRelative;
+				case (2 | 4 | 32 | 128):
+					return AttachFlags.Position | AttachFlags.Orientation | AttachFlags.EntityRelative | AttachFlags.OrientationRelative;
 				default:
 					throw new NotImplementedException(o.ToString());
 			}
+		}
+
+		public static T FlagsReflected<T>(int input)
+		{
+			int v = input;
+			int objFlags = 0;
+			foreach (var fl in Enum.GetValues(typeof(T)))
+			{
+				var integer = (int)(dynamic)fl;
+				if ((v & integer) == integer)
+				{
+					v &= ~integer;
+					objFlags |= integer;
+				}
+			}
+			if (v != 0)
+			{
+				throw new NotImplementedException("Flags for " + typeof(T).Name + ": " + v);
+			}
+			return (T)(dynamic)objFlags;
 		}
 
 		//TODO: Migrate to workingTypes
@@ -67,14 +95,22 @@ namespace LibreLancer
 			{
 				case 3:
 					return EventTypes.StartSound;
+				case 4:
+					return EventTypes.StartLightPropAnim;
 				case 6:
 					return EventTypes.StartPathAnimation;
 				case 7:
 					return EventTypes.StartSpatialPropAnim;
 				case 8:
 					return EventTypes.AttachEntity;
+				case 10:
+					return EventTypes.StartMotion;
 				case 13:
 					return EventTypes.StartPSys;
+				case 15:
+					return EventTypes.StartAudioPropAnim;
+				case 16:
+					return EventTypes.StartFogPropAnim;
 				default:
 					throw new NotImplementedException(o.ToString());
 			}

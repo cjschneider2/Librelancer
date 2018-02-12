@@ -59,7 +59,9 @@ namespace LibreLancer
 			ThnEnv.Add("DEFORMABLE", EntityTypes.Deformable);
 			ThnEnv.Add("SOUND", EntityTypes.Sound);
 			//FogModes
+			ThnEnv.Add("F_NONE", FogModes.None);
 			ThnEnv.Add("F_EXP2", FogModes.Exp2);
+			ThnEnv.Add("F_EXP", FogModes.Exp);
 			ThnEnv.Add("F_LINEAR", FogModes.Linear);
 			//EventTypes
 			ThnEnv.Add("SET_CAMERA", EventTypes.SetCamera);
@@ -73,17 +75,20 @@ namespace LibreLancer
 			ThnEnv.Add("START_FOG_PROP_ANIM", EventTypes.StartFogPropAnim);
 			ThnEnv.Add("START_CAMERA_PROP_ANIM", EventTypes.StartCameraPropAnim);
 			ThnEnv.Add("START_SOUND", EventTypes.StartSound);
+			ThnEnv.Add("START_AUDIO_PROP_ANIM", EventTypes.StartAudioPropAnim);
+			ThnEnv.Add("CONNECT_HARDPOINTS", EventTypes.ConnectHardpoints);
 			//Axis
-			ThnEnv.Add("X_AXIS", VectorMath.UnitX);
-			ThnEnv.Add("Y_AXIS", VectorMath.UnitY);
-			ThnEnv.Add("Z_AXIS", VectorMath.UnitZ);
-			ThnEnv.Add("NEG_X_AXIS", -VectorMath.UnitX);
-			ThnEnv.Add("NEG_Y_AXIS", -VectorMath.UnitY);
-			ThnEnv.Add("NEG_Z_AXIS", -VectorMath.UnitZ);
+			ThnEnv.Add("X_AXIS", Vector3.UnitX);
+			ThnEnv.Add("Y_AXIS", Vector3.UnitY);
+			ThnEnv.Add("Z_AXIS", Vector3.UnitZ);
+			ThnEnv.Add("NEG_X_AXIS", -Vector3.UnitX);
+			ThnEnv.Add("NEG_Y_AXIS", -Vector3.UnitY);
+			ThnEnv.Add("NEG_Z_AXIS", -Vector3.UnitZ);
 			//Booleans
 			ThnEnv.Add("Y", true);
 			ThnEnv.Add("N", false);
-
+			ThnEnv.Add("y", true);
+			ThnEnv.Add("n", false);
 		}
 		#endregion
 
@@ -100,7 +105,12 @@ namespace LibreLancer
 			{
 				var ent = (LuaTable)entities[i];
 				var e = GetEntity(ent);
-				Entities.Add(e.Name, e);
+				if (Entities.ContainsKey(e.Name))
+				{
+					FLLog.Error("Thn", "Overwriting entity: \"" + e.Name + '"');
+					Entities[e.Name] = e;
+				} else
+					Entities.Add(e.Name, e);
 			}
 			var events = (LuaTable)output["events"];
 			for (int i = 0; i < events.Capacity; i++)
@@ -141,6 +151,7 @@ namespace LibreLancer
 		ThnObjectFlags ConvertFlags(EntityTypes type, LuaTable table)
 		{
 			var val = (int)(float)table["flags"];
+			if (val == 0) return ThnObjectFlags.None;
 			if (val == 1) return ThnObjectFlags.Reference; //Should be for all types
 			if (type == EntityTypes.Sound)
 			{
@@ -152,28 +163,52 @@ namespace LibreLancer
 						throw new NotImplementedException();
 				}
 			}
-			else
-			{
-				switch (val)
-				{
-					case 4:
-						return ThnObjectFlags.LitDynamic;
-					case (2 | 4):
-						return ThnObjectFlags.LitDynamic | ThnObjectFlags.LitAmbient;
-					default:
-						throw new NotImplementedException();
-				}
-			}
+			return ThnEnum.FlagsReflected<ThnObjectFlags>(val);
+		}
+
+
+
+		public static Matrix4 GetMatrix(LuaTable orient)
+		{
+			var m11 = (float)((LuaTable)orient[0])[0];
+			var m12 = (float)((LuaTable)orient[0])[1];
+			var m13 = (float)((LuaTable)orient[0])[2];
+
+			var m21 = (float)((LuaTable)orient[1])[0];
+			var m22 = (float)((LuaTable)orient[1])[1];
+			var m23 = (float)((LuaTable)orient[1])[2];
+
+			var m31 = (float)((LuaTable)orient[2])[0];
+			var m32 = (float)((LuaTable)orient[2])[1];
+			var m33 = (float)((LuaTable)orient[2])[2];
+			return new Matrix4(
+				m11, m12, m13, 0,
+				m21, m22, m23, 0,
+				m31, m32, m33, 0,
+				0, 0, 0, 1
+			);
 		}
 
 		ThnEntity GetEntity(LuaTable table)
 		{
+			object o;
+
 			var e = new ThnEntity();
 			e.Name = (string)table["entity_name"];
 			e.Type = ThnEnum.Check<EntityTypes>(table["type"]);
-			e.LightGroup = (int)(float)table["lt_grp"];
-			e.SortGroup = (int)(float)table["srt_grp"];
-			e.UserFlag = (int)(float)table["usr_flg"];
+			if (table.TryGetValue("srt_grp", out o))
+			{
+				e.SortGroup = (int)(float)table["srt_grp"];
+			}
+			if (table.TryGetValue("usr_flg", out o))
+			{
+				e.UserFlag = (int)(float)table["usr_flg"];
+			}
+			if (table.TryGetValue("lt_grp", out o))
+			{
+				e.LightGroup = (int)(float)table["lt_grp"];
+			}
+			
 			Vector3 tmp;
 			if (table.TryGetVector3("ambient", out tmp))
 			{
@@ -187,7 +222,7 @@ namespace LibreLancer
 			{
 				e.Front = tmp;
 			}
-			object o;
+
 			if (table.TryGetValue("template_name", out o))
 			{
 				e.Template = (string)o;
@@ -210,6 +245,10 @@ namespace LibreLancer
 				{
 					e.MeshCategory = (string)o;
 				}
+				if (usrprops.TryGetValue("nofog", out o))
+				{
+					e.NoFog = ThnEnum.Check<bool>(o);
+				}
 			}
 
 			if (table.TryGetValue("spatialprops", out o))
@@ -221,24 +260,7 @@ namespace LibreLancer
 				}
 				if (spatialprops.TryGetValue("orient", out o))
 				{
-					var orient = (LuaTable)o;
-					var m11 = (float)((LuaTable)orient[0])[0];
-					var m12 = (float)((LuaTable)orient[0])[1];
-					var m13 = (float)((LuaTable)orient[0])[2];
-
-					var m21 = (float)((LuaTable)orient[1])[0];
-					var m22 = (float)((LuaTable)orient[1])[1];
-					var m23 = (float)((LuaTable)orient[1])[2];
-
-					var m31 = (float)((LuaTable)orient[2])[0];
-					var m32 = (float)((LuaTable)orient[2])[1];
-					var m33 = (float)((LuaTable)orient[2])[2];
-					e.RotationMatrix = new Matrix4(
-						m11, m12, m13, 0,
-						m21, m22, m23, 0,
-						m31, m32, m33, 0,
-						0  , 0  , 0  , 1
-					);
+					e.RotationMatrix = GetMatrix((LuaTable)o);
 				}
 			}
 
@@ -291,7 +313,7 @@ namespace LibreLancer
 					r.Theta = r.Phi = (float)o;
 				if (lightprops.TryGetVector3("atten", out tmp))
 				{
-					r.Attenuation = new Vector4(tmp, 0);
+                    r.Attenuation = tmp;
 				}
 				e.LightProps.Render = r;
 			}

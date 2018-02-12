@@ -37,14 +37,24 @@ namespace LibreLancer.Utf.Vms
         /// </summary>
         private uint MaterialId;
         private Material material;
+		Material defaultMaterial;
         public Material Material
         {
             get
             {
+				if (material != null && !material.Loaded) material = null;
                 if (material == null) material = materialLibrary.FindMaterial(MaterialId);
                 return material;
             }
         }
+
+		public uint MaterialCrc
+		{
+			get
+			{
+				return MaterialId;
+			}
+		}
 
         public ushort StartVertex { get; private set; }
         public ushort EndVertex { get; private set; }
@@ -75,15 +85,11 @@ namespace LibreLancer.Utf.Vms
             primitiveCount = NumRefVertices / 3;
         }
 
+		bool inited = false;
 		public void Initialize(ResourceManager cache)
         {
-            /*if (nullMaterial == null)
-            {
-                nullMaterial = new NullMaterial();
-                nullMaterial.Initialize();
-            }*/
-
-            //if (Material != null) Material.Initialize(cache);
+			inited = true;
+			defaultMaterial = cache.DefaultMaterial;
         }
 
         public void DeviceReset()
@@ -94,9 +100,12 @@ namespace LibreLancer.Utf.Vms
 
         public void Update(ICamera camera)
         {
-            /*if (Material == null) nullMaterial.Update(camera);
+			/*if (Material == null) nullMaterial.Update(camera);
             else */
-            Material.Render.Camera = camera;
+			if (Material != null)
+				Material.Render.Camera = camera;
+			else
+				defaultMaterial.Render.Camera = camera;
         }
 		MaterialAnimCollection lastmc;
 		MaterialAnim ma;
@@ -115,7 +124,7 @@ namespace LibreLancer.Utf.Vms
 			}
 			Material.Render.MaterialAnim = ma;
 			Material.Render.World = world;
-			Material.Render.Use (rstate, buff.VertexType, light);
+			Material.Render.Use (rstate, buff.VertexType, ref light);
 			buff.Draw (PrimitiveTypes.TriangleList, startVertex + StartVertex, TriangleStart, primitiveCount);
         }
 
@@ -162,24 +171,29 @@ namespace LibreLancer.Utf.Vms
 			return avg;
 		}
 
-		public void DrawBuffer(CommandBuffer buffer, VMeshData data, ushort startVertex, Matrix4 world, Lighting light, MaterialAnimCollection mc)
+		public void DrawBuffer(CommandBuffer buffer, VMeshData data, ushort startVertex, Matrix4 world, ref Lighting light, MaterialAnimCollection mc, Material overrideMat = null)
 		{
+			var mat = Material;
+			if (mat == null)
+				mat = defaultMaterial;
+			if (overrideMat != null)
+				mat = overrideMat;
 			if (lastmc != mc)
 			{
 				if (mc != null)
 				{
-					mc.Anims.TryGetValue(Material.Name, out ma);
+					mc.Anims.TryGetValue(mat.Name, out ma);
 					lastmc = mc;
 				}
 				else
 					ma = null;
 			}
 			float z = 0;
-			if (Material.Render.IsTransparent)
-				z = RenderHelpers.GetZ(world, Material.Render.Camera.Position, CalculateAvg(data, startVertex));
+			if (mat.Render.IsTransparent)
+				z = RenderHelpers.GetZ(world, mat.Render.Camera.Position, CalculateAvg(data, startVertex));
 			
 			buffer.AddCommand(
-				Material.Render,
+				mat.Render,
 				ma,
 				world,
 				light,
@@ -191,6 +205,30 @@ namespace LibreLancer.Utf.Vms
 				SortLayers.OBJECT,
 				z
 			);
+		}
+
+		public void DepthPrepass(RenderState rstate, VMeshData data, ushort startVertex, Matrix4 world, MaterialAnimCollection mc)
+		{
+			var m = Material;
+			if (m == null) m = materialLibrary.FindMaterial(0);
+			if (Material.Render.IsTransparent)
+				return;
+            if (Material.Render.DoubleSided)
+                return; //TODO: Fix depth prepass for double-sided
+			if (lastmc != mc)
+			{
+				if (mc != null)
+				{
+					mc.Anims.TryGetValue(Material.Name, out ma);
+					lastmc = mc;
+				}
+				else
+					ma = null;
+			}
+			Material.Render.MaterialAnim = ma;
+			Material.Render.World = world;
+			Material.Render.ApplyDepthPrepass(rstate);
+			data.VertexBuffer.Draw(PrimitiveTypes.TriangleList, startVertex + StartVertex, TriangleStart, primitiveCount);
 		}
     }
 }

@@ -9,7 +9,7 @@
     <RootNamespace>LibreLancer</RootNamespace>
     <AssemblyName>LibreLancer</AssemblyName>
     <FileAlignment>512</FileAlignment>
-    <TargetFrameworkVersion>v4.5</TargetFrameworkVersion>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
   </PropertyGroup>
   <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
     <DebugSymbols>true</DebugSymbols>
@@ -81,10 +81,11 @@
     <Reference Include="System.Data" />
     <Reference Include="System.Net.Http" />
     <Reference Include="System.Xml" />
-    <Reference Include="MathNet.Numerics">
-      <HintPath>..\packages\MathNet.Numerics.3.12.0\lib\net40\MathNet.Numerics.dll</HintPath>
-    </Reference>
     <Reference Include="System.Numerics" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="MySql.Data">
+      <HintPath>..\packages\MySql.Data.6.9.10\lib\net45\MySql.Data.dll</HintPath>
+    </Reference>
   </ItemGroup>
   <ItemGroup>
     <Compile Include="ConvertData.cs" />
@@ -129,8 +130,8 @@
     <Compile Include="Render\Lighting.cs" />
     <Compile Include="Render\RenderLight.cs" />
     <Compile Include="Utf\Dfm\Bone.cs" />
-    <Compile Include="Utf\Dfm\Part.cs" />
-    <Compile Include="Utf\Dfm\Mesh.cs" />
+    <Compile Include="Utf\Dfm\DfmPart.cs" />
+    <Compile Include="Utf\Dfm\DfmMesh.cs" />
     <Compile Include="Utf\Dfm\FaceGroup.cs" />
     <Compile Include="Utf\Dfm\DfmFile.cs" />
     <Compile Include="GameConfig.cs" />
@@ -155,13 +156,6 @@
     <Compile Include="GameData\Archetype.cs" />
     <Compile Include="GameData\Archetypes\Sun.cs" />
     <Compile Include="GameData\Ship.cs" />
-    <Compile Include="Sur\SurFile.cs" />
-    <Compile Include="BinaryReaderExtensions.cs" />
-    <Compile Include="Sur\Surface.cs" />
-    <Compile Include="Sur\TGroupHeader.cs" />
-    <Compile Include="Sur\Side.cs" />
-    <Compile Include="Sur\SurTriangle.cs" />
-    <Compile Include="Sur\SurVertex.cs" />
     <Compile Include="Utf\Ale\AleFile.cs" />
     <Compile Include="Utf\Ale\ALEffectLib.cs" />
     <Compile Include="Utf\Ale\AlchemyNodeLibrary.cs" />
@@ -186,9 +180,7 @@
     <Compile Include="Interface\UIManager.cs" />
     <Compile Include="Render\IdentityCamera.cs" />
     <Compile Include="Interface\UIElement.cs" />
-    <Compile Include="Interface\UIMenuButton.cs" />
     <Compile Include="Interface\UIAnimation.cs" />
-    <Compile Include="Interface\FlyInLeft.cs" />
     <Compile Include="Thn\ThnScript.cs" />
     <Compile Include="Thn\ThnObjectFlags.cs" />
     <Compile Include="Thn\AttachFlags.cs" />
@@ -201,7 +193,6 @@
     <Compile Include="Render\Billboards.cs" />
     <Compile Include="ChaseCamera.cs" />
     <Compile Include="MathExtensions.cs" />
-    <Compile Include="PlayerController.cs" />
     <Compile Include="Fx\FxNode.cs" />
     <Compile Include="Fx\FxEmitter.cs" />
     <Compile Include="Fx\FxAppearance.cs" />
@@ -230,7 +221,6 @@
     <Compile Include="Fx\Particle.cs" />
     <Compile Include="Fx\ParticleLibrary.cs" />
     <Compile Include="Fx\ParticleEffect.cs" />
-    <Compile Include="Fx\FxRootNode.cs" />
     <Compile Include="Fx\ParticleEffectInstance.cs" />
     <Compile Include="Infocards\Infocard.cs" />
     <Compile Include="Infocards\RDLParse.cs" />
@@ -273,7 +263,6 @@
     <Compile Include="Render\LightEquipRenderer.cs" />
     <Compile Include="GameStates\SpaceGameplay.cs" />
     <Compile Include="Render\PhysicsDebugRenderer.cs" />
-    <Compile Include="CompoundSurShape.cs" />
     <Compile Include="Gameplay\GameWorld.cs" />
     <Compile Include="Gameplay\GameObject.cs" />
     <Compile Include="Gameplay\GameComponent.cs" />
@@ -300,7 +289,6 @@
     <Compile Include="GameData\Items\AnimationEquipment.cs" />
     <Compile Include="Infocards\InfocardDisplay.cs" />
     <Compile Include="FontManager.cs" />
-    <Compile Include="Interface\Hud.cs" />
     <Compile Include="Utf\Cmp\MaterialAnimCollection.cs" />
     <Compile Include="Utf\Cmp\MaterialAnim.cs" />
     <Compile Include="Render\DynamicLight.cs" />
@@ -313,11 +301,6 @@
     <Compile Include="Thn\ParameterCurve.cs" />
     <Compile Include="Thn\MotionPath.cs" />
     <Compile Include="Render\ShaderCaps.cs" />
-    <Compile Include="Interface\HudModelElement.cs" />
-    <Compile Include="Interface\HudNumberBoxElement.cs" />
-    <Compile Include="Interface\HudGaugeElement.cs" />
-    <Compile Include="Interface\HudToggleButtonElement.cs" />
-    <Compile Include="Interface\Maneuver.cs" />
     <Compile Include="Render\Materials\NomadMaterial.cs" />
     <Compile Include="Gameplay\Components\ShipControlComponent.cs" />
     <Compile Include="InputManager.cs" />
@@ -333,6 +316,65 @@
     <Compile Include="GameData\Base.cs" />
     <Compile Include="Thn\EventFlags.cs" />
     <Compile Include="Thn\ThnEnum.cs" />
+    <Compile Include="Gameplay\Components\DockComponent.cs" />
+    <Compile Include="GameData\Items\PowerEquipment.cs" />
+    <Compile Include="Interface\DebugDrawing.cs" />
+    <Compile Include="Gameplay\GameSession.cs" />
+    <Compile Include="Utf\Dfm\DfmVertex.cs" />
+    <Compile Include="Render\CharacterRenderer.cs" />
+    <Compile Include="Utf\Dfm\DfmHardpoint.cs" />
+    <Compile Include="Gameplay\PIDController.cs" />
+    <Compile Include="CircularBuffer.cs" />
+    <Compile Include="Interface\DebugGraph.cs" />
+    <Compile Include="Gameplay\Components\AutopilotComponent.cs" />
+    <Compile Include="GameData\DockSphere.cs" />
+    <Compile Include="GameData\DockAction.cs" />
+    <Compile Include="Gameplay\Components\TradelaneMoveComponent.cs" />
+    <Compile Include="Gameplay\GameMessageKind.cs" />
+    <Compile Include="Gameplay\Components\AsteroidFieldComponent.cs" />
+    <Compile Include="Interface\IUIContainer.cs" />
+    <Compile Include="Net\NetConstants.cs" />
+    <Compile Include="Net\GameClient.cs" />
+    <Compile Include="Net\LocalServerInfo.cs" />
+    <Compile Include="Interface\UIBackgroundElement.cs" />
+    <Compile Include="Interface\Animations\FlyInRight.cs" />
+    <Compile Include="Interface\Animations\FlyInLeft.cs" />
+    <Compile Include="Interface\Animations\FlyOutLeft.cs" />
+    <Compile Include="Interface\Menu\UIMenuButton.cs" />
+    <Compile Include="Interface\Menu\UIMessageBox.cs" />
+    <Compile Include="Interface\Menu\UIXButton.cs" />
+    <Compile Include="Interface\Hud\Maneuver.cs" />
+    <Compile Include="Interface\Hud\HudToggleButtonElement.cs" />
+    <Compile Include="Interface\Hud\HudGaugeElement.cs" />
+    <Compile Include="Interface\Hud\HudBaseButtonElement.cs" />
+    <Compile Include="Interface\Hud\Hud.cs" />
+    <Compile Include="Interface\Hud\HudModelElement.cs" />
+    <Compile Include="Interface\Hud\HudNavBox.cs" />
+    <Compile Include="Interface\Hud\HudNumberBoxElement.cs" />
+    <Compile Include="Interface\Hud\HudChatBox.cs" />
+    <Compile Include="Interface\Menu\UIServerList.cs" />
+    <Compile Include="Interface\GridControl.cs" />
+    <Compile Include="Resources.cs" />
+    <Compile Include="Interface\Menu\UIServerDescription.cs" />
+    <Compile Include="Interface\Menu\UICharacterList.cs" />
+    <Compile Include="Net\Protocol\AuthenticationKind.cs" />
+    <Compile Include="Net\Protocol\CharacterSelectInfo.cs" />
+    <Compile Include="Net\Protocol\NetPacking.cs" />
+    <Compile Include="Net\Protocol\PacketKind.cs" />
+    <Compile Include="Net\Server\PlayerAccount.cs" />
+    <Compile Include="Net\Server\GameServer.cs" />
+    <Compile Include="Net\Server\ServerDatabase.cs" />
+    <Compile Include="Net\Server\NetPlayer.cs" />
+    <Compile Include="Net\Server\ListedCharacter.cs" />
+    <Compile Include="Render\PointLight.cs" />
+    <Compile Include="Utf\UtfLoader.cs" />
+    <Compile Include="Render\Materials\NormalDebugMaterial.cs" />
+    <Compile Include="Fx\NodeReference.cs" />
+    <Compile Include="Gameplay\Components\WeaponControlComponent.cs" />
+    <Compile Include="Gameplay\Components\WeaponComponent.cs" />
+    <Compile Include="GameData\Items\GunEquipment.cs" />
+    <Compile Include="Gameplay\Components\PhysicsComponent.cs" />
+    <Compile Include="JThreads.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Shaders\Basic_Fragment.frag" />
@@ -366,6 +408,14 @@
     <EmbeddedResource Include="Shaders\NomadMaterial.frag" />
     <EmbeddedResource Include="Shaders\Nomad_PositionNormalTexture.vs" />
     <EmbeddedResource Include="Shaders\Polyline.vs" />
+    <EmbeddedResource Include="Shaders\DepthPrepass_Normal.vs" />
+    <EmbeddedResource Include="Shaders\DepthPrepass_Normal.frag" />
+    <EmbeddedResource Include="Shaders\DepthPrepass_AlphaTest.vs" />
+    <EmbeddedResource Include="Shaders\DepthPrepass_AlphaTest.frag" />
+    <EmbeddedResource Include="Shaders\lightingcull.glcompute" />
+    <EmbeddedResource Include="Shaders\Normals_PositionNormal.vs" />
+    <EmbeddedResource Include="Shaders\Normals.frag" />
+    <EmbeddedResource Include="Shaders\Basic_PositionColor.vs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\LibreLancer.Base\LibreLancer.Base.csproj">
@@ -380,10 +430,6 @@
       <Project>{F89CC613-0C7A-4936-9D79-86CBBF26593E}</Project>
       <Name>LibreLancer.Compatibility</Name>
     </ProjectReference>
-    <ProjectReference Include="..\..\extern\jitterphysics\source\Jitter\Jitter.csproj">
-      <Project>{AA03EF1A-94F7-4D30-AB14-2092863FF923}</Project>
-      <Name>Jitter</Name>
-    </ProjectReference>
     <ProjectReference Include="..\LibreLancer.Thorn\LibreLancer.Thorn.csproj">
       <Project>{1D0655D3-D4BC-4155-B180-ABD09FF47BD2}</Project>
       <Name>LibreLancer.Thorn</Name>
@@ -392,24 +438,37 @@
       <Project>{6967FE1C-5953-4416-889C-FF10AE1F7DD1}</Project>
       <Name>LibreLancer.ImageLib</Name>
     </ProjectReference>
+    <ProjectReference Include="..\..\extern\lidgren-network-gen3\Lidgren.Network\Lidgren.Network.csproj">
+      <Project>{49BA1C69-6104-41AC-A5D8-B54FA9F696E8}</Project>
+      <Name>Lidgren.Network</Name>
+    </ProjectReference>
+    <ProjectReference Include="..\LibreLancer.Physics\LibreLancer.Physics.csproj">
+      <Project>{C2ACC8B3-1805-45D2-B32B-CCBA545AA09F}</Project>
+      <Name>LibreLancer.Physics</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
-       Other similar extension points exist, see Microsoft.Common.targets.
+       Other similar extension points exist, see Microsoft.Common.targets.   -->
   <Target Name="BeforeBuild">
   </Target>
   <Target Name="AfterBuild">
   </Target>
-  -->
+
   <ItemGroup />
   <ItemGroup>
-    <None Include="OpenTK.dll.config">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
     <None Include="Utf\Ale\AleCrc.tt">
       <Generator>TextTemplatingFileGenerator</Generator>
       <LastGenOutput>AleCrc.cs</LastGenOutput>
     </None>
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="Net\" />
+    <Folder Include="Interface\Animations\" />
+    <Folder Include="Interface\Hud\" />
+    <Folder Include="Interface\Menu\" />
+    <Folder Include="Net\Protocol\" />
+    <Folder Include="Net\Server\" />
   </ItemGroup>
 </Project>

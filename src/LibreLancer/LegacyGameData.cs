@@ -26,18 +26,23 @@ namespace LibreLancer
 		Legacy.FreelancerData fldata;
 		ResourceManager resource;
 		List<GameData.IntroScene> IntroScenes;
-		public LegacyGameData (string path, ResourceManager resman)
+		public LegacyGameData(string path, ResourceManager resman)
 		{
 			resource = resman;
-			Compatibility.VFS.Init (path);
-			var flini = new Legacy.FreelancerIni ();
-			fldata = new Legacy.FreelancerData (flini);
+			Compatibility.VFS.Init(path);
+			var flini = new Legacy.FreelancerIni();
+			fldata = new Legacy.FreelancerData(flini);
 
 		}
 
 		public string ResolveDataPath(string input)
 		{
 			return Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + input);
+		}
+
+		public Dictionary<string, string> GetBaseNavbarIcons()
+		{
+			return fldata.BaseNavBar.Navbar;
 		}
 
 		public List<string> GetIntroMovies()
@@ -55,18 +60,46 @@ namespace LibreLancer
 		}
 		public GameData.Base GetBase(string id)
 		{
+			
 			var legacy = fldata.Universe.FindBase(id);
+			var mbase = fldata.MBases.FindBase(id);
 			var b = new GameData.Base();
 			foreach (var room in legacy.Rooms)
 			{
 				var nr = new GameData.BaseRoom();
+				var mroom = mbase.FindRoom(room.Nickname);
 				nr.Music = room.Music;
 				nr.ThnPaths = new List<string>();
+				nr.PlayerShipPlacement = room.PlayerShipPlacement;
 				foreach (var path in room.SceneScripts)
 					nr.ThnPaths.Add(Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + path));
+				nr.Hotspots = new List<GameData.BaseHotspot>();
+				foreach (var hp in room.Hotspots)
+					nr.Hotspots.Add(new GameData.BaseHotspot()
+					{
+						Name = hp.Name,
+						Behavior = hp.Behavior,
+						Room = hp.RoomSwitch,
+						SetVirtualRoom = hp.VirtualRoom
+					});
 				nr.Nickname = room.Nickname;
 				if (room.Nickname == legacy.StartRoom) b.StartRoom = nr;
 				nr.Camera = room.Camera;
+				nr.Npcs = new List<GameData.BaseNpc>();
+				if (mroom != null)
+				{
+					foreach (var npc in mroom.NPCs)
+					{
+						/*var newnpc = new GameData.BaseNpc();
+						newnpc.StandingPlace = npc.StandMarker;
+						var gfnpc = mbase.FindNpc(npc.Npc);
+						newnpc.HeadMesh = fldata.Bodyparts.FindBodypart(gfnpc.Head).MeshPath;
+						newnpc.BodyMesh = fldata.Bodyparts.FindBodypart(gfnpc.Body).MeshPath;
+						newnpc.LeftHandMesh = fldata.Bodyparts.FindBodypart(gfnpc.LeftHand).MeshPath;
+						newnpc.RightHandMesh = fldata.Bodyparts.FindBodypart(gfnpc.RightHand).MeshPath;
+						nr.Npcs.Add(newnpc);*/
+					}
+				}
 				b.Rooms.Add(nr);
 			}
 			return b;
@@ -75,7 +108,8 @@ namespace LibreLancer
 		{
 			fldata.LoadData();
 			IntroScenes = new List<GameData.IntroScene>();
-			foreach(var b in fldata.Universe.Bases) {
+			foreach (var b in fldata.Universe.Bases)
+			{
 				if (b.Nickname.StartsWith("intro", StringComparison.InvariantCultureIgnoreCase))
 				{
 					foreach (var room in b.Rooms)
@@ -91,27 +125,30 @@ namespace LibreLancer
 							}
 							isc.Music = room.Music;
 							IntroScenes.Add(isc);
-						}
+						} 
 					}
 				}
 			}
-			resource.AddPreload(
-				fldata.EffectShapes.Files.Select(txmfile => Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + txmfile))
-			);
-			foreach (var shape in fldata.EffectShapes.Shapes)
+			if (resource != null)
 			{
-				var s = new TextureShape()
+				resource.AddPreload(
+					fldata.EffectShapes.Files.Select(txmfile => Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + txmfile))
+				);
+				foreach (var shape in fldata.EffectShapes.Shapes)
 				{
-					Texture = shape.Value.TextureName,
-					Nickname = shape.Value.ShapeName,
-					Dimensions = shape.Value.Dimensions
-				};
-				resource.AddShape(shape.Key, s);
+					var s = new TextureShape()
+					{
+						Texture = shape.Value.TextureName,
+						Nickname = shape.Value.ShapeName,
+						Dimensions = shape.Value.Dimensions
+					};
+					resource.AddShape(shape.Key, s);
+				}
 			}
 		}
 		public void PopulateCursors()
 		{
-			resource.LoadTxm(
+			resource.LoadResourceFile(
 				Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + fldata.Mouse.TxmFile)
 			);
 			foreach (var lc in fldata.Mouse.Cursors)
@@ -137,15 +174,26 @@ namespace LibreLancer
 		{
 			return Infocards.RDLParse.Parse(fldata.Infocards.GetXmlResource(id));
 		}
+		public string GetString(int id)
+		{
+			return fldata.Infocards.GetStringResource(id);
+		}
 		public GameData.IntroScene GetIntroScene()
 		{
-			//var rand = new Random();
-			//return IntroScenes[rand.Next(0, IntroScenes.Count)];
-			return IntroScenes[1];
+			var rand = new Random();
+			return IntroScenes[rand.Next(0, IntroScenes.Count)];
 		}
+#if DEBUG
+		public GameData.IntroScene GetIntroSceneSpecific(int i)
+		{
+			if (i > IntroScenes.Count)
+				return null;
+			return IntroScenes[i];
+		}
+#endif
 		public void LoadHardcodedFiles()
 		{
-			resource.LoadVms (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + "INTERFACE/interface.generic.vms"));
+			resource.LoadResourceFile (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + "INTERFACE/interface.generic.vms"));
 		}
 		public IDrawable GetMenuButton()
 		{
@@ -191,13 +239,21 @@ namespace LibreLancer
 		{
 			return fldata.Universe.FindSystem(id) != null;
 		}
+		public IEnumerable<string> ListSystems()
+		{
+			foreach (var sys in fldata.Universe.Systems) yield return sys.Nickname;
+		}
+		public IEnumerable<string> ListBases()
+		{
+			foreach (var bse in fldata.Universe.Bases) yield return bse.Nickname;
+		}
 		public GameData.StarSystem GetSystem(string id)
 		{
 			var legacy = fldata.Universe.FindSystem (id);
 			if (fldata.Stars != null)
 			{
 				foreach (var txmfile in fldata.Stars.TextureFiles)
-					resource.LoadTxm(Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + txmfile));
+					resource.LoadResourceFile(Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + txmfile));
 			}
 			var sys = new GameData.StarSystem ();
 			sys.AmbientColor = legacy.AmbientColor ?? Color4.White;
@@ -242,11 +298,11 @@ namespace LibreLancer
 					lt.Range = src.Range.Value;
 					lt.Direction = src.Direction ?? new Vector3(0, 0, 1);
 					lt.Kind = ((src.Type ?? Legacy.Universe.LightType.Point) == Legacy.Universe.LightType.Point) ? LightKind.Point : LightKind.Directional;
-					lt.Attenuation = new Vector4(src.Attenuation ?? Vector3.UnitY, 0);
+                    lt.Attenuation = src.Attenuation ?? Vector3.UnitY;
 					if (src.AttenCurve != null)
 					{
 						lt.Kind = LightKind.PointAttenCurve;
-						lt.Attenuation = ApproximateCurve.GetCubicFunction(
+						lt.Attenuation = ApproximateCurve.GetQuadraticFunction(
 							fldata.Graphs.FindFloatGraph(src.AttenCurve).Points.ToArray()
 						);
 					}
@@ -349,7 +405,7 @@ namespace LibreLancer
 				foreach (var f in ast.TexturePanels.Files) {
 					panels = new Legacy.Universe.TexturePanels (f);
 					foreach (var txmfile in panels.Files)
-						resource.LoadTxm (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + txmfile));
+						resource.LoadResourceFile (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + txmfile));
 				}
 			}
 			if (ast.Band != null) {
@@ -383,7 +439,7 @@ namespace LibreLancer
 					Matrix4.CreateRotationZ (MathHelper.DegreesToRadians (c.Rotation.Z));
 				var n = c.Name;
 				var arch = fldata.Asteroids.FindAsteroid (c.Name);
-				resource.LoadMat (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + arch.MaterialLibrary));
+				resource.LoadResourceFile (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + arch.MaterialLibrary));
 				sta.Drawable = resource.GetDrawable (Compatibility.VFS.GetPath (fldata.Freelancer.DataPath + arch.DaArchetype));
 				a.Cube.Add (sta);
 			}
@@ -431,7 +487,7 @@ namespace LibreLancer
 			n.Zone = sys.Zones.Where((z) => z.Nickname.ToLower() == nbl.ZoneName.ToLower()).First();
 			var panels = new Legacy.Universe.TexturePanels(nbl.TexturePanels.Files[0]);
 			foreach (var txmfile in panels.Files)
-				resource.LoadTxm(Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + txmfile));
+				resource.LoadResourceFile(Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + txmfile));
 			n.ExteriorFill = nbl.ExteriorFillShape;
 			n.ExteriorColor = nbl.ExteriorColor ?? Color4.White;
 			n.FogColor = nbl.FogColor ?? Color4.Black;
@@ -510,6 +566,7 @@ namespace LibreLancer
 				n.ExclusionZones = new List<GameData.ExclusionZone>();
 				foreach (var excz in nbl.ExclusionZones)
 				{
+					if (excz.Exclusion == null) continue;
 					var e = new GameData.ExclusionZone();
 					e.Zone = sys.Zones.Where((z) => z.Nickname.ToLower() == excz.Exclusion.Nickname.ToLower()).First();
 					e.FogFar = excz.FogFar ?? n.FogRange.Y;
@@ -553,8 +610,15 @@ namespace LibreLancer
 			var legacy = fldata.Ships.GetShip (nickname);
 			var ship = new GameData.Ship ();
 			foreach (var matlib in legacy.MaterialLibraries)
-				resource.LoadMat (matlib);
+				resource.LoadResourceFile (matlib);
 			ship.Drawable = resource.GetDrawable (legacy.DaArchetypeName);
+			ship.Mass = legacy.Mass;
+			ship.AngularDrag = legacy.AngularDrag;
+			ship.RotationInertia = legacy.RotationInertia;
+			ship.SteeringTorque = legacy.SteeringTorque;
+			ship.CruiseSpeed = 300;
+			ship.StrafeForce = legacy.StrafeForce;
+            ship.ChaseOffset = legacy.CameraOffset;
 			return ship;
 		}
 
@@ -563,16 +627,28 @@ namespace LibreLancer
 			var archetype = fldata.Solar.FindSolar(solar);
 			//Load archetype references
 			foreach (var path in archetype.TexturePaths)
-				resource.LoadTxm(path);
+				resource.LoadResourceFile(path);
 			foreach (var path in archetype.MaterialPaths)
-				resource.LoadMat(path);
+				resource.LoadResourceFile(path);
 			//Get drawable
 			return resource.GetDrawable(archetype.DaArchetypeName);
+		}
+
+		public IDrawable GetAsteroid(string asteroid)
+		{
+			var ast = fldata.Asteroids.FindAsteroid(asteroid);
+			resource.LoadResourceFile(ResolveDataPath(ast.MaterialLibrary));
+			return resource.GetDrawable(ResolveDataPath(ast.DaArchetype));
 		}
 
 		public IDrawable GetProp(string prop)
 		{
 			return resource.GetDrawable(ResolveDataPath(fldata.PetalDb.Props[prop]));
+		}
+
+		public IDrawable GetCart(string cart)
+		{
+			return resource.GetDrawable(ResolveDataPath(fldata.PetalDb.Carts[cart]));
 		}
 
 		public IDrawable GetRoom(string room)
@@ -587,6 +663,14 @@ namespace LibreLancer
 			obj.Nickname = o.Nickname;
 			obj.DisplayName = o.IdsName;
 			obj.Position = o.Pos.Value;
+			if (o.DockWith != null)
+			{
+				obj.Dock = new DockAction() { Kind = DockKinds.Base, Target = o.DockWith };
+			}
+			else if (o.Goto != null)
+			{
+				obj.Dock = new DockAction() { Kind = DockKinds.Jump, Target = o.Goto.System, Exit = o.Goto.Exit, Tunnel = o.Goto.TunnelEffect };
+			}
 			if (o.Rotate != null) {
 				obj.Rotation = 
 					Matrix4.CreateRotationX (MathHelper.DegreesToRadians (o.Rotate.Value.X)) *
@@ -595,9 +679,9 @@ namespace LibreLancer
 			}
 			//Load archetype references
 			foreach (var path in o.Archetype.TexturePaths)
-				resource.LoadTxm (path);
+				resource.LoadResourceFile (path);
 			foreach (var path in o.Archetype.MaterialPaths)
-				resource.LoadMat (path);
+				resource.LoadResourceFile (path);
 			//Construct archetype
 			if (o.Archetype is Legacy.Solar.Sun) {
 				var sun = new GameData.Archetypes.Sun();
@@ -631,9 +715,46 @@ namespace LibreLancer
 				obj.Archetype = sun;
 			} else {
 				obj.Archetype = new GameData.Archetype ();
+				foreach (var dockSphere in o.Archetype.DockingSpheres)
+				{
+					obj.Archetype.DockSpheres.Add(new GameData.DockSphere()
+					{
+						Name = dockSphere.Name,
+						Hardpoint = dockSphere.Hardpoint,
+						Radius = dockSphere.Radius,
+						Script = dockSphere.Script
+					});
+				}
+				if (o.Archetype.OpenAnim != null)
+				{
+					foreach (var sph in obj.Archetype.DockSpheres)
+						sph.Script =  sph.Script ?? o.Archetype.OpenAnim;
+				}
+				if (o.Archetype is Legacy.Solar.TradelaneRing)
+				{
+					obj.Archetype.DockSpheres.Add(new GameData.DockSphere()
+					{
+						Name = "tradelane",
+						Hardpoint = "HpRightLane",
+						Radius = 30
+					});
+					obj.Archetype.DockSpheres.Add(new GameData.DockSphere()
+					{
+						Name = "tradelane",
+						Hardpoint = "HpLeftLane",
+						Radius = 30
+					});
+					obj.Dock = new DockAction()
+					{
+						Kind = DockKinds.Tradelane,
+						Target = o.NextRing,
+						TargetLeft = o.PrevRing
+					};
+				}
 			}
 			obj.Archetype.ArchetypeName = o.Archetype.GetType ().Name;
 			obj.Archetype.Drawable = drawable;
+			obj.Archetype.LODRanges = o.Archetype.LODRanges;
 			var ld = o.Loadout;
 			var archld = fldata.Loadouts.FindLoadout(o.Archetype.LoadoutName);
 			if(ld != null) ProcessLoadout(ld, obj);
@@ -662,10 +783,33 @@ namespace LibreLancer
 			{
 				equip = GetAttachedFx((Legacy.Equipment.AttachedFx)val);
 			}
+			if (val is Legacy.Equipment.PowerCore)
+			{
+				var pc = (val as Legacy.Equipment.PowerCore);
+				if(pc.MaterialLibrary != null)
+					resource.LoadResourceFile(ResolveDataPath(pc.MaterialLibrary));
+				var drawable = resource.GetDrawable(ResolveDataPath(pc.DaArchetype));
+				equip = new GameData.Items.PowerEquipment()
+				{
+					Model = drawable
+				};
+			}
+            if (val is Legacy.Equipment.Gun)
+            {
+                var gn = (val as Legacy.Equipment.Gun);
+                if(gn.MaterialLibrary != null)
+                    resource.LoadResourceFile(ResolveDataPath(gn.MaterialLibrary));
+                var drawable = resource.GetDrawable(ResolveDataPath(gn.DaArchetype));
+                equip = new GameData.Items.GunEquipment()
+                {
+                    Model = drawable,
+                    TurnRateRadians = MathHelper.DegreesToRadians(gn.TurnRate)
+                };
+            }
 			if (val is Legacy.Equipment.Thruster)
 			{
 				var th = (val as Legacy.Equipment.Thruster);
-				resource.LoadMat(ResolveDataPath(th.MaterialLibrary));
+				resource.LoadResourceFile(ResolveDataPath(th.MaterialLibrary));
 				var drawable = resource.GetDrawable(ResolveDataPath(th.DaArchetype));
 				equip = new GameData.Items.ThrusterEquipment()
 				{
@@ -676,6 +820,9 @@ namespace LibreLancer
 					Particles = GetEffect(th.Particles)
 				};
 			}
+            equip.Nickname = val.Nickname;
+            equip.HPChild = val.HPChild;
+            equip.LODRanges = val.LODRanges;
 			return equip;
 		}
 		void ProcessLoadout(Legacy.Solar.Loadout ld, GameData.SystemObject obj)
@@ -686,6 +833,7 @@ namespace LibreLancer
 				if (val == null)
 					continue;
 				GameData.Items.Equipment equip = GetEquipment(val);
+                //if (equip is GameData.Items.GunEquipment) continue;
 				if (equip != null)
 				{
 					if (key.StartsWith("__noHardpoint", StringComparison.Ordinal))
@@ -696,6 +844,11 @@ namespace LibreLancer
 					}
 				}
 			}
+		}
+
+		public bool HasEffect(string effectName)
+		{
+			return fldata.Effects.FindEffect(effectName) != null || fldata.Effects.FindVisEffect(effectName) != null;
 		}
 
 		public ParticleEffect GetEffect(string effectName)
@@ -709,10 +862,7 @@ namespace LibreLancer
 			foreach (var texfile in visfx.Textures)
 			{
 				var path = Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + texfile);
-				if (path.EndsWith(".txm"))
-					resource.LoadTxm(path);
-				else if (path.EndsWith(".mat"))
-					resource.LoadMat(path);
+				resource.LoadResourceFile(path);
 			}
 			var alepath = Compatibility.VFS.GetPath(fldata.Freelancer.DataPath + visfx.AlchemyPath);
 			var ale = new AleFile(alepath);

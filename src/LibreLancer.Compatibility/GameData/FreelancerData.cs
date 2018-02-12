@@ -1,4 +1,7 @@
 ﻿using System;
+using System.IO;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
 using LibreLancer.Compatibility.GameData.Equipment;
 using LibreLancer.Compatibility.GameData.Solar;
@@ -34,8 +37,11 @@ namespace LibreLancer.Compatibility.GameData
 		public RichFontsIni RichFonts;
 		public PetalDbIni PetalDb;
 		public HudIni Hud;
+		public BaseNavBarIni BaseNavBar;
+		public MBasesIni MBases;
 		public bool Loaded = false;
 
+		public bool LoadDacom = true;
 		public FreelancerData (FreelancerIni fli)
 		{
 			Freelancer = fli;
@@ -45,8 +51,18 @@ namespace LibreLancer.Compatibility.GameData
 		{
 			if (Loaded)
 				return;
-			Dacom = new DacomIni ();
-			Infocards = new InfocardManager (Freelancer.Resources);
+			if(LoadDacom)
+				Dacom = new DacomIni ();
+			if (Freelancer.JsonResources != null)
+			{
+				var strs = JsonConvert.DeserializeObject<Dictionary<int, string>>(File.ReadAllText(VFS.GetPath("EXE\\" + Freelancer.JsonResources.Item1)));
+				var ifcs = JsonConvert.DeserializeObject<Dictionary<int, string>>(File.ReadAllText(VFS.GetPath("EXE\\" + Freelancer.JsonResources.Item2)));
+				Infocards = new InfocardManager(strs, ifcs);
+			}
+			else
+			{
+				Infocards = new InfocardManager(Freelancer.Resources);
+			}
 			//Dfm
 			Bodyparts = new BodypartsIni (Freelancer.BodypartsPath, this);
 			Costumes = new CostumesIni (Freelancer.CostumesPath, this);
@@ -56,8 +72,10 @@ namespace LibreLancer.Compatibility.GameData
 				Equipment.AddEquipmentIni (eq, this);
 			//Solars
 			Solar = new SolararchIni (Freelancer.SolarPath, this);
-			if(Freelancer.StarsPath != null)
-				Stars = new StararchIni (Freelancer.StarsPath);
+			if (Freelancer.StarsPath != null)
+				Stars = new StararchIni(Freelancer.StarsPath);
+			else
+				Stars = new StararchIni("DATA\\SOLAR\\stararch.ini");
 			Asteroids = new AsteroidArchIni ();
 			foreach (var ast in Freelancer.AsteroidPaths)
 				Asteroids.AddFile (ast);
@@ -99,6 +117,10 @@ namespace LibreLancer.Compatibility.GameData
 			//Hud
 			Hud = new HudIni();
 			Hud.AddIni(Freelancer.HudPath);
+			//navbar.ini
+			BaseNavBar = new BaseNavBarIni();
+			//mbases.ini
+			MBases = new MBasesIni();
 		}
 	}
 }

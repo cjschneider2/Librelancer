@@ -28,10 +28,15 @@ namespace LibreLancer
 		public int BufferWidth = 1024;
 		public int BufferHeight = 768;
 		public int MSAASamples = 0;
+		public bool VSync = true;
+		public Guid? UUID;
 
 		//This default is to stop dlopen on linux from trying to open itself
 		[XmlIgnore]
 		public string MpvOverride = "__MPV_OVERRIDE_STRING";
+
+		[XmlIgnore]
+		public Func<FreelancerGame, GameState> CustomState;
 
 		private GameConfig(Func<string> filePath) 
 		{
@@ -44,6 +49,16 @@ namespace LibreLancer
 
 		Func<string> filePath;
 
+		public static bool CheckFLDirectory(string dir)
+		{
+			if (!Directory.Exists(Path.Combine(dir, "EXE")) || 
+			    !Directory.Exists(Path.Combine(dir, "DATA")))
+			{
+				return false;
+			}
+			return true;
+		}
+
 		public static GameConfig Create(bool loadFile = true, Func<string> filePath = null)
 		{
 			if (!loadFile) return new GameConfig((filePath ?? DefaultConfigPath));
@@ -55,10 +70,14 @@ namespace LibreLancer
 				{
 					var loaded = (GameConfig)xml.Deserialize(reader);
 					loaded.filePath = (filePath ?? DefaultConfigPath);
+					if (loaded.UUID == null)
+						loaded.UUID = Guid.NewGuid();
 					return loaded;
 				}
 			}
 			var cfg = new GameConfig((filePath ?? DefaultConfigPath));
+			if (cfg.UUID == null)
+				cfg.UUID = Guid.NewGuid();
 			cfg.Save();
 			return cfg;
 		}
@@ -87,7 +106,7 @@ namespace LibreLancer
 			if (Platform.RunningOS == OS.Windows)
 			{
 				string bindir = Path.GetDirectoryName(typeof(GameConfig).Assembly.Location);
-				var fullpath = Path.Combine(bindir, IntPtr.Size == 8 ? "win64" : "win32");
+				var fullpath = Path.Combine(bindir, IntPtr.Size == 8 ? "x64" : "x86");
 				SetDllDirectory(fullpath);
 			}
 			else

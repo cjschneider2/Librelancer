@@ -19,7 +19,7 @@ using LibreLancer.Utf.Mat;
 using LibreLancer.Utf.Cmp;
 namespace LibreLancer
 {
-	
+
 	public abstract class RenderMaterial
 	{
 		public MaterialAnim MaterialAnim;
@@ -30,19 +30,44 @@ namespace LibreLancer
 		public bool Fade = false;
 		public float FadeNear = 0;
 		public float FadeFar = 0;
-		public abstract void Use(RenderState rstate, IVertexType vertextype, Lighting lights);
-		static Texture2D nullTexture;
+		public abstract void Use(RenderState rstate, IVertexType vertextype, ref Lighting lights);
+        public virtual void UpdateFlipNormals() {} //Optimisation
 		public abstract bool IsTransparent { get; }
 		public bool DoubleSided = false;
 		Texture2D[] textures = new Texture2D[8];
+		bool[] loaded = new bool[8];
 		protected static bool HasSpotlight(ref Lighting lights)
 		{
-			for (int i = 0; i < lights.Lights.Count; i++) {
+			for (int i = 0; i < lights.Lights.Count; i++)
+			{
 				if (lights.Lights[i].Kind == LightKind.Spotlight) return true;
 			}
 			return false;
 		}
-		public static void SetLights(ShaderVariables shader, Lighting lights)
+
+		static ShaderVariables _normalPrepass;
+		protected static ShaderVariables NormalPrepassShader
+		{
+			get
+			{
+				if (_normalPrepass == null) _normalPrepass = ShaderCache.Get("DepthPrepass_Normal.vs", "DepthPrepass_Normal.frag");
+				return _normalPrepass;
+			}
+		}
+
+		static ShaderVariables _alphaPrepass;
+		protected static ShaderVariables AlphaTestPrepassShader
+		{
+			get
+			{
+				if (_alphaPrepass == null) _alphaPrepass = ShaderCache.Get("DepthPrepass_AlphaTest.vs", "DepthPrepass_AlphaTest.frag");
+				return _alphaPrepass;
+			}
+		}
+
+		public abstract void ApplyDepthPrepass(RenderState rstate);
+
+		public static void SetLights(ShaderVariables shader, ref Lighting lights)
 		{
 			bool hasSpotlight = HasSpotlight(ref lights);
 			var h = lights.Hash;
@@ -54,6 +79,7 @@ namespace LibreLancer
 				return;
 			shader.SetAmbientColor(lights.Ambient);
 			shader.SetLightCount(lights.Lights.Count);
+			shader.SetTilesX(lights.NumberOfTilesX);
 			for (int i = 0; i < lights.Lights.Count; i++)
 			{
 				var lt = lights.Lights[i];
@@ -65,7 +91,8 @@ namespace LibreLancer
 				shader.SetLightsPos(i, new Vector4(lt.Kind == LightKind.Directional ? lt.Direction : lt.Position, kind));
 				shader.SetLightsColorRange(i, new Vector4(lt.Color.R, lt.Color.G, lt.Color.B, lt.Range));
 				shader.SetLightsAttenuation(i, lt.Attenuation);
-				if (hasSpotlight) {
+				if (hasSpotlight)
+				{
 					if (lt.Kind == LightKind.Spotlight)
 					{
 						shader.SetLightsDir(i, lt.Direction);
@@ -89,23 +116,11 @@ namespace LibreLancer
 				shader.SetFogRange(new Vector2(lights.FogDensity, 0));
 			}
 		}
-		Texture2D GetNull()
-		{
-			if (nullTexture == null)
-			{
-				nullTexture = new Texture2D(256, 256, false, SurfaceFormat.Color);
-				Color4b[] colors = new Color4b[nullTexture.Width * nullTexture.Height];
-				for (int i = 0; i < colors.Length; i++)
-					colors[i] = Color4b.White;
-				nullTexture.SetData<Color4b>(colors);
-			}
-			return nullTexture;
-		}
 
 		protected Texture2D GetTexture(int cacheidx, string tex)
 		{
 			if (tex == null)
-				return GetNull();
+				return (Texture2D)Library.FindTexture(ResourceManager.NullTextureName);
 			if (textures[cacheidx] == null)
 				textures[cacheidx] = (Texture2D)Library.FindTexture(tex);
 			var tex2d = textures[cacheidx];
@@ -114,35 +129,43 @@ namespace LibreLancer
 			return textures[cacheidx];
 		}
 
-		protected void BindTexture(RenderState rstate, int cacheidx, string tex, int unit, SamplerFlags flags, bool throwonNull = true)
+		protected void BindTexture(RenderState rstate, int cacheidx, string tex, int unit, SamplerFlags flags, string nullName = null)
 		{
 			if (tex == null)
 			{
-				if (throwonNull)
+				if (nullName == null)
 					throw new Exception();
-				GetNull().BindTo(unit);
+				tex = nullName;
+			}
+			if (textures[cacheidx] == null || !loaded[cacheidx])
+				textures[cacheidx] = (Texture2D)Library.FindTexture(tex);
+			if (textures[cacheidx] == null)
+			{
+				textures[cacheidx] = (Texture2D)Library.FindTexture(ResourceManager.NullTextureName);
+				loaded[cacheidx] = false;
 			}
 			else
+				loaded[cacheidx] = true;
+			var tex2d = textures[cacheidx];
+			if (tex2d.IsDisposed)
+				tex2d = textures[cacheidx] = (Texture2D)Library.FindTexture(tex);
+			tex2d.BindTo(unit);
+			tex2d.SetFiltering(rstate.PreferredFilterLevel);
+			if ((flags & SamplerFlags.ClampToEdgeU) == SamplerFlags.ClampToEdgeU)
 			{
-				if(textures[cacheidx] == null)
-					textures[cacheidx] = (Texture2D)Library.FindTexture(tex);
-				var tex2d = textures[cacheidx];
-				if (tex2d.IsDisposed)
-					tex2d = textures[cacheidx] = (Texture2D)Library.FindTexture(tex);
-				tex2d.BindTo(unit);
-				tex2d.SetFiltering(rstate.PreferredFilterLevel);
-				if ((flags & SamplerFlags.ClampToEdgeU) == SamplerFlags.ClampToEdgeU) {
-					tex2d.SetWrapModeS (WrapMode.ClampToEdge);
-				}
-				if ((flags & SamplerFlags.ClampToEdgeV) == SamplerFlags.ClampToEdgeV) {
-					tex2d.SetWrapModeT (WrapMode.ClampToEdge);
-				}
-				if ((flags & SamplerFlags.MirrorRepeatU) == SamplerFlags.MirrorRepeatU) {
-					tex2d.SetWrapModeS (WrapMode.MirroredRepeat);
-				}
-				if ((flags & SamplerFlags.MirrorRepeatU) == SamplerFlags.MirrorRepeatV) {
-					tex2d.SetWrapModeT(WrapMode.MirroredRepeat);
-				}
+				tex2d.SetWrapModeS(WrapMode.ClampToEdge);
+			}
+			if ((flags & SamplerFlags.ClampToEdgeV) == SamplerFlags.ClampToEdgeV)
+			{
+				tex2d.SetWrapModeT(WrapMode.ClampToEdge);
+			}
+			if ((flags & SamplerFlags.MirrorRepeatU) == SamplerFlags.MirrorRepeatU)
+			{
+				tex2d.SetWrapModeS(WrapMode.MirroredRepeat);
+			}
+			if ((flags & SamplerFlags.MirrorRepeatU) == SamplerFlags.MirrorRepeatV)
+			{
+				tex2d.SetWrapModeT(WrapMode.MirroredRepeat);
 			}
 
 		}

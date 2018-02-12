@@ -46,10 +46,11 @@ namespace LibreLancer
 		static ShaderVariables[] sh_posNormalColorTexture = new ShaderVariables[ShaderCapsExtensions.N_SHADERCAPS];
 		static ShaderVariables[] sh_posTexture = new ShaderVariables[ShaderCapsExtensions.N_SHADERCAPS];
 		static ShaderVariables[] sh_pos = new ShaderVariables[ShaderCapsExtensions.N_SHADERCAPS];
+        static ShaderVariables[] sh_posColor = new ShaderVariables[ShaderCapsExtensions.N_SHADERCAPS];
 		static ShaderVariables GetShader(IVertexType vertextype, ShaderCaps caps)
 		{
 			var i = caps.GetIndex();
-			if (vertextype is VertexPositionNormalTexture)
+			if (vertextype is VertexPositionNormalTexture || vertextype is Utf.Dfm.DfmVertex)
 			{
 				if (sh_posNormalTexture[i] == null)
 					sh_posNormalTexture[i] = ShaderCache.Get(
@@ -99,9 +100,24 @@ namespace LibreLancer
 					);
 				return sh_pos[i];
 			}
+            if(vertextype is VertexPositionColor)
+            {
+                if (sh_posColor[i] == null)
+                    sh_posColor[i] = ShaderCache.Get(
+                        "Basic_PositionColor.vs",
+                        "Basic_Fragment.frag",
+                        caps
+                    );
+                return sh_posColor[i];
+            }
 			throw new NotImplementedException(vertextype.GetType().Name);
 		}
-		public override void Use(RenderState rstate, IVertexType vertextype, Lighting lights)
+        ShaderVariables lastShader;
+        public override void UpdateFlipNormals()
+        {
+            lastShader.SetFlipNormal(FlipNormals);
+        }
+		public override void Use(RenderState rstate, IVertexType vertextype, ref Lighting lights)
 		{
 			if (Camera == null)
 				return;
@@ -109,28 +125,35 @@ namespace LibreLancer
 			if (HasSpotlight(ref lights)) caps |= ShaderCaps.Spotlight;
 			if (EtEnabled) caps |= ShaderCaps.EtEnabled;
 			if (Fade) caps |= ShaderCaps.FadeEnabled;
-			if (GetTexture(0, DtSampler).Dxt1)
+            var dxt1 = GetDxt1();
+            if (dxt1)
 			{
-				caps |= ShaderCaps.AlphaTestEnabled; //Shitty way of dealing with alpha_mask
+				caps |= ShaderCaps.AlphaTestEnabled; 
+                //Shitty way of dealing with alpha_mask
+                //FL has a lot of DXT1 textures that aren't part of alpha_mask
+                //so this brings overall performance down.
+                //Don't change any of this stuff unless you can verify it works
+                //in all places! (Check Li01 shipyards, Bw10 tradelanes)
 			}
 			var shader = GetShader(vertextype, caps);
+            lastShader = shader;
 			shader.SetWorld(ref World);
 			shader.SetView(Camera);
 			shader.SetViewProjection(Camera);
 			//Dt
 			shader.SetDtSampler(0);
-			BindTexture(rstate, 0, DtSampler, 0, DtFlags, false);
+			BindTexture(rstate, 0, DtSampler, 0, DtFlags, ResourceManager.WhiteTextureName);
 			//Dc
 			shader.SetDc(Dc);
 			//Oc
 			shader.SetOc(Oc);
-			if (AlphaEnabled || Fade || OcEnabled)
+			if (AlphaEnabled || Fade || OcEnabled || dxt1)
 			{
 				rstate.BlendMode = BlendMode.Normal;
 			}
 			else
 			{
-				rstate.BlendMode = BlendMode.Opaque;
+                rstate.BlendMode = BlendMode.Opaque; //TODO: Maybe I can just leave this out?
 			}
 			//Fade
 			if (Fade) shader.SetFadeRange(new Vector2(FadeNear, FadeFar));
@@ -155,21 +178,39 @@ namespace LibreLancer
 			if (EtEnabled)
 			{
 				shader.SetEtSampler(1);
-				BindTexture(rstate, 1, EtSampler, 1, EtFlags, false);
+				BindTexture(rstate, 1, EtSampler, 1, EtFlags, ResourceManager.NullTextureName);
 			}
 			//Set lights
-			SetLights(shader, lights);
+			SetLights(shader, ref lights);
 			var normalMatrix = World;
 			normalMatrix.Invert();
 			normalMatrix.Transpose();
 			shader.SetNormalMatrix(ref normalMatrix);
 			shader.UseProgram();
 		}
+
+		public override void ApplyDepthPrepass(RenderState rstate)
+		{
+			rstate.BlendMode = BlendMode.Normal;
+            //TODO: This is screwy - Re-do DXT1 test if need be for perf
+			var shader = AlphaTestPrepassShader;
+            BindTexture(rstate, 0, DtSampler, 0, DtFlags, ResourceManager.WhiteTextureName);
+			shader.SetWorld(ref World);
+			shader.SetViewProjection(Camera);
+			shader.UseProgram();
+		}
+
+        bool GetDxt1()
+        {
+            var tex = GetTexture(0, DtSampler);
+            if (tex != null) return tex.Dxt1;
+            return false;
+        }
 		public override bool IsTransparent
 		{
 			get
 			{
-				return AlphaEnabled;
+                return AlphaEnabled && !GetDxt1();
 			}
 		}
 	}

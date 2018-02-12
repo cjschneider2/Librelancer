@@ -61,11 +61,15 @@ namespace LibreLancer
 
 		public void ChangeState(GameState state)
 		{
+			if (currentState != null)
+				currentState.Unregister();
 			currentState = state;
 		}
 		protected override void Load()
         {
 			//Move to stop _TSGetMainThread error on OSX
+			MinimumWindowSize = new Point(640, 480);
+			SetVSync(Config.VSync);
 			new IdentityCamera(this);
 			uithread = Thread.CurrentThread.ManagedThreadId;
 			useintromovies = _cfg.IntroMovies;
@@ -83,22 +87,24 @@ namespace LibreLancer
 			GameData = new LegacyGameData(_cfg.FreelancerPath, ResourceManager);
 			IntroMovies = GameData.GetIntroMovies();
 			MpvOverride = _cfg.MpvOverride;
-			new Thread(() =>
-			{
-				GameData.LoadData();
-				Sound = new SoundManager(GameData, Audio);
-				FLLog.Info("Game", "Finished loading game data");
-				InitialLoadComplete = true;
-			}).Start();
-			//
-			Renderer2D = new Renderer2D(RenderState);
+            Thread GameDataLoaderThread = new Thread(() =>
+            {
+                GameData.LoadData();
+                Sound = new SoundManager(GameData, Audio);
+                FLLog.Info("Game", "Finished loading game data");
+                InitialLoadComplete = true;
+            });
+            GameDataLoaderThread.Name = "GamedataLoader";
+            GameDataLoaderThread.Start();
+            //
+            Renderer2D = new Renderer2D(RenderState);
 			Fonts = new FontManager(this);
 			Billboards = new Billboards ();
 			Nebulae = new NebulaVertices();
 			var vp = new ViewportManager (RenderState);
 			vp.Push (0, 0, Width, Height);
 			Screenshots = new ScreenshotManager(this);
-			if (useintromovies)
+			if (useintromovies && IntroMovies.Count > 0)
 				ChangeState(new IntroMovie(this, 0));
 			else
 				ChangeState(new LoadingDataState(this));
@@ -122,6 +128,7 @@ namespace LibreLancer
 		int drawCallsPerFrame = 0;
 		protected override void Draw (double elapsed)
 		{
+			ViewportManager.Instance.Replace(0, 0, Width, Height);
 			fps_updatetimer -= elapsed;
 			if (fps_updatetimer <= 0) {
 				Title = string.Format ("LibreLancer: {0:00.00}fps/ {2:00.00}ms - {1} Drawcalls", RenderFrequency, drawCallsPerFrame, FrameTime * 1000.0);

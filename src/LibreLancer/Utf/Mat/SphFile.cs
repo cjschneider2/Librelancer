@@ -36,8 +36,11 @@ namespace LibreLancer.Utf.Mat
 		
 		private bool ready;
 
-        private ILibFile materialLibrary;
+        private ILibFile library;
 
+		public MatFile MaterialLibrary;
+		public TxmFile TextureLibrary;
+		public VmsFile VMeshLibrary;
         public float Radius { get; private set; }
 
         private List<string> sideMaterialNames;
@@ -51,8 +54,8 @@ namespace LibreLancer.Utf.Mat
                     sideMaterials = new Material[sideMaterialNames.Count];
                     for (int i = 0; i < sideMaterialNames.Count; i++)
                     {
-                        sideMaterials[i] = materialLibrary.FindMaterial(CrcTool.FLModelCrc(sideMaterialNames[i]));
-                        if (sideMaterials[i] == null) sideMaterials[i] = new Material();
+                        sideMaterials[i] = library.FindMaterial(CrcTool.FLModelCrc(sideMaterialNames[i]));
+                        //if (sideMaterials[i] == null) sideMaterials[i] = new Material();
                     }
                 }
 
@@ -60,40 +63,76 @@ namespace LibreLancer.Utf.Mat
             }
         }
 
-        public SphFile(string path, ILibFile materialLibrary)
+		public List<string> SideMaterialNames
+		{
+			get
+			{
+				return sideMaterialNames;
+			}
+		}
+
+		public SphFile(string path, ILibFile materialLibrary) : this(parseFile(path), materialLibrary)
+		{
+
+		}
+		public SphFile(IntermediateNode root, ILibFile library)
         {
-            if (path == null) throw new ArgumentNullException("path");
-            if (materialLibrary == null) throw new ArgumentNullException("materialLibrary");
+            if (root == null) throw new ArgumentNullException("root");
+            if (library == null) throw new ArgumentNullException("materialLibrary");
 
             ready = false;
 
-            this.materialLibrary = materialLibrary;
+			this.library = library;
             sideMaterialNames = new List<string>();
 
-            IntermediateNode sphereNode = parseFile(path)[0] as IntermediateNode;
-            if (sphereNode == null) throw new FileContentException(FILE_TYPE, "SphFile without sphere");
+			bool sphereSet = false;
+			foreach (Node node in root)
+			{
+				switch (node.Name.ToLowerInvariant())
+				{
+					case "sphere":
+						if (sphereSet) throw new Exception("Multiple sphere nodes");
+						sphereSet = true;
+						var sphereNode = (IntermediateNode)node;
+						foreach (LeafNode sphereSubNode in sphereNode)
+						{
+							string name = sphereSubNode.Name.ToLowerInvariant();
 
-            foreach (LeafNode sphereSubNode in sphereNode)
-            {
-                string name = sphereSubNode.Name.ToLowerInvariant();
-
-				if (name.StartsWith ("m", StringComparison.OrdinalIgnoreCase)) sideMaterialNames.Add (sphereSubNode.StringData);
-				else if (name == "radius") Radius = sphereSubNode.SingleArrayData [0];
-                else if (name == "sides")
-                {
-					int count = sphereSubNode.Int32ArrayData [0];
-                    if (count != sideMaterialNames.Count) throw new Exception("Invalid number of sides in " + sphereNode.Name + ": " + count);
-                }
-                else throw new Exception("Invalid node in " + sphereNode.Name + ": " + sphereSubNode.Name);
-            }
+							if (name.StartsWith("m", StringComparison.OrdinalIgnoreCase)) sideMaterialNames.Add(sphereSubNode.StringData);
+							else if (name == "radius") Radius = sphereSubNode.SingleArrayData[0];
+							else if (name == "sides")
+							{
+								int count = sphereSubNode.Int32ArrayData[0];
+								if (count != sideMaterialNames.Count) throw new Exception("Invalid number of sides in " + node.Name + ": " + count);
+							}
+							else throw new Exception("Invalid node in " + node.Name + ": " + sphereSubNode.Name);
+						}
+						break;
+					case "vmeshlibrary":
+						IntermediateNode vMeshLibraryNode = node as IntermediateNode;
+						if (VMeshLibrary == null) VMeshLibrary = new VmsFile(vMeshLibraryNode, library);
+						else throw new Exception("Multiple vmeshlibrary nodes in 3db root");
+						break;
+					case "material library":
+						IntermediateNode materialLibraryNode = node as IntermediateNode;
+						if (MaterialLibrary == null) MaterialLibrary = new MatFile(materialLibraryNode, library);
+						else throw new Exception("Multiple material library nodes in 3db root");
+						break;
+					case "texture library":
+						IntermediateNode textureLibraryNode = node as IntermediateNode;
+						if (TextureLibrary == null) TextureLibrary = new TxmFile(textureLibraryNode);
+						else throw new Exception("Multiple texture library nodes in 3db root");
+						break;
+				}
+			}
         }
-
+		Material defaultMaterial;
 		public void Initialize(ResourceManager cache)
         {
             if (sideMaterialNames.Count >= 6)
 			{
 				sphere = new QuadSphere(48);
-
+				defaultMaterial = cache.DefaultMaterial;
                 ready = true;
             }
         }
@@ -136,22 +175,45 @@ namespace LibreLancer.Utf.Mat
         {
 			throw new NotImplementedException();
         }
-		public void DrawBuffer(CommandBuffer buffer, Matrix4 world, Lighting lighting)
+		public void DepthPrepass(RenderState rstate, Matrix4 world)
+		{
+			if (SideMaterials.Length < 6)
+				return;
+			var transform = Matrix4.CreateScale(Radius) * world;
+			for (int i = 0; i < 6; i++)
+			{
+				if (SideMaterials[i].Render.IsTransparent) continue;
+				int start, count;
+				Vector3 pos;
+				sphere.GetDrawParameters(faces[i], out start, out count, out pos);
+				SideMaterials[i].Render.Camera = _camera;
+				SideMaterials[i].Render.World = transform;
+				SideMaterials[i].Render.ApplyDepthPrepass(rstate);
+				sphere.VertexBuffer.Draw(PrimitiveTypes.TriangleList, 0, start, count);
+			}
+		}
+		public void DrawBuffer(CommandBuffer buffer, Matrix4 world, ref Lighting lighting, Material overrideMat = null)
 		{
 			if (SideMaterials.Length < 6)
 				return;
 			if (ready)
 			{
+				for (int i = 0; i < SideMaterials.Length; i++)
+					if (SideMaterials[i] != null && !SideMaterials[i].Loaded) SideMaterials[i].Loaded = false;
 				for (int i = 0; i < 6; i++)
 				{
 					int start, count;
 					Vector3 pos;
 					sphere.GetDrawParameters(faces[i], out start, out count, out pos);
-                    SideMaterials[i].Render.Camera = _camera;
+					if(SideMaterials[i] == null) SideMaterials[i] = library.FindMaterial(CrcTool.FLModelCrc(sideMaterialNames[i]));
+					var mat = SideMaterials[i] ?? defaultMaterial;
+					mat = overrideMat ?? mat;
+                    mat.Render.Camera = _camera;
+					var transform = Matrix4.CreateScale(Radius) * world;
 					buffer.AddCommand(
-						SideMaterials[i].Render,
+						mat.Render,
 						null,
-						Matrix4.CreateScale(Radius) * world,
+						transform,
 						lighting,
 						sphere.VertexBuffer,
 						PrimitiveTypes.TriangleList,
@@ -162,8 +224,13 @@ namespace LibreLancer.Utf.Mat
 					);
 				}
 				//Draw atmosphere
-				if (SideMaterials.Length > 6)
+				if (SideMaterials.Length > 6 && overrideMat == null)
 				{
+					if (SideMaterials[6] == null)
+					{
+						SideMaterials[6] = library.FindMaterial(CrcTool.FLModelCrc(sideMaterialNames[6]));
+						if (SideMaterials[6] == null) return;
+					}
 					var mat = (AtmosphereMaterial)SideMaterials[6].Render;
 					var transform = Matrix4.CreateScale(Radius * mat.Scale) * world;
 					for (int i = 0; i < 6; i++)

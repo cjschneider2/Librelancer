@@ -53,6 +53,8 @@ namespace LibreLancer.GLDelegates
     public delegate void BlendFuncSeparate(int srcRGB, int drcRGB, int srcAlpha, int dstAlpha);
     [SuppressUnmanagedCodeSecurity]
     public delegate void PolygonMode(int faces, int mode);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void LineWidth(float width);
     [SuppressUnmanagedCodeSecurity]
     public delegate void DepthFunc(int func);
     [SuppressUnmanagedCodeSecurity]
@@ -63,6 +65,8 @@ namespace LibreLancer.GLDelegates
     public delegate void DepthMask(bool flag);
     [SuppressUnmanagedCodeSecurity]
     public delegate void AlphaFunc(int func, float _ref);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void PolygonOffset(float factor, float units);
     //Textures
     [SuppressUnmanagedCodeSecurity]
     public delegate void GenTextures(int n, out uint textures);
@@ -70,6 +74,8 @@ namespace LibreLancer.GLDelegates
     public delegate void DeleteTextures(int n, ref uint textures);
     [SuppressUnmanagedCodeSecurity]
     public delegate void TexParameteri(int target, int pname, int param);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void TexParameterfv(int target, int pname, ref Vector4 param);
     [SuppressUnmanagedCodeSecurity]
     public delegate void BindTexture(int target, uint id);
     [SuppressUnmanagedCodeSecurity]
@@ -84,7 +90,9 @@ namespace LibreLancer.GLDelegates
     public delegate void TexSubImage2D(int target, int level, int xoffset, int yoffset, int width, int height, int format, int type, IntPtr data);
 	[SuppressUnmanagedCodeSecurity]
 	public delegate void GetTexImage(int target, int level, int format, int type, IntPtr pixels);
-    //Shaders
+	//Shaders
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void DispatchCompute(uint num_groups_x, uint num_groups_y, uint num_groups_z);
     [SuppressUnmanagedCodeSecurity]
     public delegate uint CreateShader(int shaderType);
     [SuppressUnmanagedCodeSecurity]
@@ -117,6 +125,8 @@ namespace LibreLancer.GLDelegates
     public delegate void Uniform1i(int location, int v0);
     [SuppressUnmanagedCodeSecurity]
     public delegate void Uniform1f(int location, float v0);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void Uniform2i(int location, int v1, int v2);
     [SuppressUnmanagedCodeSecurity]
     public delegate void Uniform2f(int location, float v0, float v1);
     [SuppressUnmanagedCodeSecurity]
@@ -150,6 +160,14 @@ namespace LibreLancer.GLDelegates
     public delegate void DrawBuffers(int n, IntPtr bufs);
 	[SuppressUnmanagedCodeSecurity]
 	public delegate void DrawBuffer(int buf);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate IntPtr MapBuffer(uint target, uint access);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate bool UnmapBuffer(uint target);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void BindBufferBase(uint target, uint index, uint buffer);
+	[SuppressUnmanagedCodeSecurity]
+	public delegate void MemoryBarrier(int barriers);
     //Drawing
     [SuppressUnmanagedCodeSecurity]
     public delegate void DrawElements(int mode, int count, int type, IntPtr indices);

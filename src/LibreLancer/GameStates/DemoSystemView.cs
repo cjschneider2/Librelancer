@@ -47,14 +47,14 @@ C# Memory Usage: {5}
 			sys = g.GameData.GetSystem ("li01");
 			camera = new DebugCamera (g.Viewport);
 			camera.Zoom = 5000;
-			sysrender = new SystemRenderer (camera, g.GameData, g.ResourceManager);
+			sysrender = new SystemRenderer (camera, g.GameData, g.ResourceManager, g);
 			world = new GameWorld(sysrender);
 			world.LoadSystem(sys, g.ResourceManager);
 			g.Sound.PlayMusic(sys.MusicSpace);
 			camera.UpdateProjection ();
 
 			trender = new Renderer2D (Game.RenderState);
-			font = Font.FromSystemFont (trender, "Agency FB", 16);
+			font = g.Fonts.GetSystemFont("Agency FB");
 			g.Keyboard.KeyDown += G_Keyboard_KeyDown;
 			g.Keyboard.TextInput += G_Keyboard_TextInput;
 		}
@@ -158,19 +158,19 @@ C# Memory Usage: {5}
 			}
 			if (Game.Keyboard.IsKeyDown(Keys.W))
 			{
-				camera.MoveVector = VectorMath.Forward;
+				camera.MoveVector = Vector3.Forward;
 			}
 			if (Game.Keyboard.IsKeyDown(Keys.S))
 			{
-				camera.MoveVector = VectorMath.Backward;
+				camera.MoveVector = Vector3.Backward;
 			}
 			if (Game.Keyboard.IsKeyDown(Keys.A))
 			{
-				camera.MoveVector = VectorMath.Left;
+				camera.MoveVector = Vector3.Left;
 			}
 			if (Game.Keyboard.IsKeyDown(Keys.D))
 			{
-				camera.MoveVector = VectorMath.Right;
+				camera.MoveVector = Vector3.Right;
 			}
 			if (Game.Keyboard.IsKeyDown(Keys.D1))
 			{
@@ -190,42 +190,17 @@ C# Memory Usage: {5}
 		{
 			sysrender.Draw ();
 			trender.Start (Game.Width, Game.Height);
-			DrawShadowedText (string.Format(DEMO_TEXT,camera.Position.X, camera.Position.Y, camera.Position.Z, sys.Id, sys.Name, SizeSuffix(GC.GetTotalMemory(false)), Game.Renderer), 5, 5);
+			DebugDrawing.DrawShadowedText (trender, font, 16, string.Format(DEMO_TEXT,camera.Position.X, camera.Position.Y, camera.Position.Z, sys.Id, sys.Name, DebugDrawing.SizeSuffix(GC.GetTotalMemory(false)), Game.Renderer), 5, 5);
 
 			if (textEntry)
 			{
-				DrawShadowedText("Change System (Esc to cancel): " + currentText, 5, 200);
+				DebugDrawing.DrawShadowedText(trender, font, 16, "Change System (Esc to cancel): " + currentText, 5, 200);
 			}
 			if (current_msg != null)
 			{
-				DrawShadowedText(current_msg, 5, 230, Color4.Red);
+				DebugDrawing.DrawShadowedText(trender, font, 16, current_msg, 5, 230, Color4.Red);
 			}
 			trender.Finish ();
-		}
-
-		static readonly string[] SizeSuffixes =
-				   { "bytes", "KB", "MB", "GB", "TB", "PB", "EB", "ZB", "YB" };
-		static string SizeSuffix(Int64 value)
-		{
-			if (value < 0) { return "-" + SizeSuffix(-value); }
-			if (value == 0) { return "0.0 bytes"; }
-
-			int mag = (int)Math.Log(value, 1024);
-			decimal adjustedSize = (decimal)value / (1L << (mag * 10));
-
-			return string.Format("{0:n1} {1}", adjustedSize, SizeSuffixes[mag]);
-		}
-
-		void DrawShadowedText(string text, float x, float y, Color4? color = null)
-		{
-			trender.DrawString (font,
-				text,
-				x + 2, y + 2,
-				Color4.Black);
-			trender.DrawString (font,
-				text,
-				x, y,
-				color ?? Color4.White);
 		}
 	}
 }

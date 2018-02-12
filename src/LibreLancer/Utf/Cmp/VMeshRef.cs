@@ -26,6 +26,7 @@ using System.IO;
 //using FLParser.Utf;
 
 using LibreLancer.Utf.Vms;
+using LibreLancer.Utf.Mat;
 //using FLApi.Universe;
 
 namespace LibreLancer.Utf.Cmp
@@ -38,6 +39,13 @@ namespace LibreLancer.Utf.Cmp
         public uint HeaderSize { get; private set; }
 
         private uint vMeshLibId;
+		public uint MeshCrc
+		{
+			get
+			{
+				return vMeshLibId;
+			}
+		}
         private VMeshData mesh;
         public VMeshData Mesh
         {
@@ -128,11 +136,16 @@ namespace LibreLancer.Utf.Cmp
             if (ready) Mesh.Draw(rstate, StartMesh, endMesh, StartVertex, world, light, mc);
         }
 
-		public void DrawBuffer(CommandBuffer buffer, Matrix4 world, Lighting light, MaterialAnimCollection mc)
+		public void DrawBuffer(CommandBuffer buffer, Matrix4 world, ref Lighting light, MaterialAnimCollection mc, Material overrideMat = null)
 		{
 			if (Mesh.FlexibleVertexFormat == (D3DFVF.XYZ | D3DFVF.NORMAL))
 				return;
-			if (ready) Mesh.DrawBuffer(buffer, StartMesh, endMesh, StartVertex, world, light, Center, mc);
+			if (ready) Mesh.DrawBuffer(buffer, StartMesh, endMesh, StartVertex, world, ref light, Center, mc, overrideMat);
+		}
+
+		public void DepthPrepass(RenderState rstate, Matrix4 world, MaterialAnimCollection mc)
+		{
+			if (ready) Mesh.DepthPrepass(rstate, StartMesh, endMesh, StartVertex, world, mc);
 		}
 
         public override string ToString()

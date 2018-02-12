@@ -59,6 +59,16 @@ namespace LibreLancer
 			}
 		}
 
+        public IntPtr GetHwnd()
+        {
+            if (Platform.RunningOS != OS.Windows) return IntPtr.Zero;
+            var wminfo = new SDL.SDL_SysWMinfo();
+            SDL.SDL_VERSION(out wminfo.version);
+            if (SDL.SDL_GetWindowWMInfo(windowptr, ref wminfo) != SDL.SDL_bool.SDL_TRUE) return IntPtr.Zero;
+            if (wminfo.subsystem != SDL.SDL_SYSWM_TYPE.SDL_SYSWM_WINDOWS) return IntPtr.Zero;
+            return wminfo.info.win.window;
+        }
+
 		public bool MouseVisible
 		{
 			get
@@ -181,6 +191,37 @@ namespace LibreLancer
             Renderer = "Direct3D9 (ANGLE)";
         }
 
+		public void SetVSync(bool vsync)
+		{
+			if (vsync)
+			{
+				if (SDL.SDL_GL_SetSwapInterval(-1) < 0)
+					SDL.SDL_GL_SetSwapInterval(1);
+			}
+			else
+			{
+				SDL.SDL_GL_SetSwapInterval(0);
+			}
+		}
+
+		Point minWindowSize = Point.Zero;
+
+		public Point MinimumWindowSize
+		{
+			get
+			{
+				return minWindowSize;
+			} 
+			set
+			{
+				minWindowSize = value;
+				if(windowptr != IntPtr.Zero)
+					SDL.SDL_SetWindowMinimumSize(windowptr, value.X, value.Y);
+			}
+		}
+
+		public event Action WillClose;
+
 		public void Run()
 		{
             SSEMath.Load();
@@ -188,6 +229,7 @@ namespace LibreLancer
 				FLLog.Error ("SDL", "SDL_Init failed, exiting.");
 				return;
 			}
+			SDL.SDL_SetHint(SDL.SDL_HINT_IME_INTERNAL_EDITING, "1");
 			//Set GL states
 			SDL.SDL_GL_SetAttribute (SDL.SDL_GLattr.SDL_GL_CONTEXT_MAJOR_VERSION, 3);
 			SDL.SDL_GL_SetAttribute (SDL.SDL_GLattr.SDL_GL_CONTEXT_MINOR_VERSION, 2);
@@ -205,6 +247,10 @@ namespace LibreLancer
 				             height,
 				             flags
 			             );
+			if (minWindowSize != Point.Zero)
+			{
+				SDL.SDL_SetWindowMinimumSize(sdlWin, minWindowSize.X, minWindowSize.Y);
+			}
 			if (sdlWin == IntPtr.Zero) {
 				FLLog.Error ("SDL", "Failed to create window, exiting.");
 				return;
@@ -217,7 +263,12 @@ namespace LibreLancer
             else
             {
                 var glcontext = SDL.SDL_GL_CreateContext(sdlWin);
-                if (glcontext == IntPtr.Zero)
+                bool check = GL.CheckStringSDL();
+                if(!check) {
+                    FLLog.Warning("GL", "GL Version Insufficient - Using DX9");
+                    SDL.SDL_GL_DeleteContext(glcontext);
+                }
+                if (glcontext == IntPtr.Zero || !check)
                 {
                     if (Platform.RunningOS == OS.Windows)
                     {
@@ -229,9 +280,13 @@ namespace LibreLancer
                         return;
                     }
                 }
-                GL.LoadSDL();
-                Renderer = string.Format("{0} ({1})", GL.GetString(GL.GL_VERSION), GL.GetString(GL.GL_RENDERER));
+                else
+                {
+                    GL.LoadSDL();
+                    Renderer = string.Format("{0} ({1})", GL.GetString(GL.GL_VERSION), GL.GetString(GL.GL_RENDERER));
+                }
             }
+			SetVSync(true);
             //Init game state
             RenderState = new RenderState();
 			Load();
@@ -243,14 +298,13 @@ namespace LibreLancer
 			double elapsed = 0;
 			SDL.SDL_Event e;
 			SDL.SDL_StopTextInput();
-            if (SDL.SDL_GL_SetSwapInterval(-1) < 0)
-                SDL.SDL_GL_SetSwapInterval(1);
 			while (running) {
 				//Pump message queue
 				while (SDL.SDL_PollEvent (out e) != 0) {
 					switch (e.type) {
 					case SDL.SDL_EventType.SDL_QUIT:
 						{
+							if (WillClose != null) WillClose();
 							running = false; //TODO: Raise Event
 							break;
 						}
@@ -299,8 +353,13 @@ namespace LibreLancer
 							Keyboard.OnKeyUp ((Keys)e.key.keysym.sym, (KeyModifiers)e.key.keysym.mod);
 							break;
 						}
+					case SDL.SDL_EventType.SDL_WINDOWEVENT:
+						if(e.window.windowEvent == SDL.SDL_WindowEventID.SDL_WINDOWEVENT_RESIZED)
+							SDL.SDL_GetWindowSize(windowptr, out width, out height);
+						break;
 					}
 				}
+
 				//Do game things
 				if (!running)
 					break;
@@ -337,6 +396,15 @@ namespace LibreLancer
 			}
 			Cleanup ();
 			SDL.SDL_Quit ();
+		}
+
+		public void ToggleFullScreen()
+		{
+			if (fullscreen)
+				SDL.SDL_SetWindowFullscreen(windowptr, 0);
+			else
+				SDL.SDL_SetWindowFullscreen(windowptr, (int)SDL.SDL_WindowFlags.SDL_WINDOW_FULLSCREEN_DESKTOP);
+			fullscreen = !fullscreen;
 		}
 
 		//TODO: Terrible Hack

@@ -21,7 +21,7 @@ namespace LibreLancer
 	public struct Lighting
 	{
 		public const int MAX_LIGHTS = 9;
-		public static readonly Lighting Empty = new Lighting() { Enabled = false };
+		public static Lighting Empty = new Lighting() { Enabled = false };
         public bool Enabled;
         public Color4 Ambient;
         public LightsArray Lights;
@@ -29,6 +29,7 @@ namespace LibreLancer
 		public float FogDensity;
         public Color4 FogColor;
         public Vector2 FogRange;
+		public int NumberOfTilesX;
 
         bool needsHashCalculation;
         int _hash;

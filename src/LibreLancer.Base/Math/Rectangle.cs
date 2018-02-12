@@ -43,6 +43,31 @@ namespace LibreLancer
 		{
 			return Contains (pt.X, pt.Y);
 		}
+
+		public bool Intersects(Rectangle other)
+		{
+			return (other.X < (X + Width) &&
+					X < (other.X + other.Width) &&
+					other.Y < (Y + Height) &&
+					Y < (other.Y + other.Height));
+		}
+
+		public override bool Equals(object obj)
+		{
+			if (obj is Rectangle)
+			{
+				return ((Rectangle)obj) == this;
+			}
+			return false;
+		}
+		public static bool operator ==(Rectangle a, Rectangle b)
+		{
+			return a.X == b.X && a.Y == b.Y && a.Width == b.Width && a.Height == b.Height;
+		}
+		public static bool operator !=(Rectangle a, Rectangle b)
+		{
+			return a.X != b.X || a.Y != b.Y || a.Width != b.Width || a.Height != b.Height;
+		}
     }
 }
 

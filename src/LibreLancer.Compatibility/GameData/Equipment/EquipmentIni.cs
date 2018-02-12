@@ -42,6 +42,7 @@ namespace LibreLancer.Compatibility.GameData.Equipment
 					Equip.Add(new Light(s, data));
 					break;
 				case "power":
+					Equip.Add(new PowerCore(s));
 					break;
 				case "scanner":
 					break;
@@ -89,6 +90,7 @@ namespace LibreLancer.Compatibility.GameData.Equipment
 				case "munition":
 					break;
 				case "gun":
+                    Equip.Add(new Gun(s));
 					break;
 				case "mine":
 					break;

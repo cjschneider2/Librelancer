@@ -17,6 +17,17 @@ packages/
 
 # Visual Studio
 *.suo
+*.sln
+!/slngen/slngen.sln
+*.pdb
+*.exp
+*.iobj
+*.ipdb
+*.lib
+*.user
+*.opendb
+.vs/
+
 
 # Sublime Text
 *.sublime-project

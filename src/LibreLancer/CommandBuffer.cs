@@ -28,17 +28,18 @@ namespace LibreLancer
 		const int MAX_TRANSPARENT_COMMANDS = 16384;
 
 		//public List<RenderCommand> Commands = new List<RenderCommand>();
-		RenderCommand[] Commands = new RenderCommand[MAX_COMMANDS];
+		//RenderCommand[] Commands = new RenderCommand[MAX_COMMANDS];
 		RenderCommand[] Transparents = new RenderCommand[MAX_TRANSPARENT_COMMANDS];
 		int currentCommand = 0;
 		int transparentCommand = 0;
 		Action _transparentSort;
-
-		public void StartFrame()
+        RenderState rstate;
+        public void StartFrame(RenderState rstate)
 		{
 			currentCommand = 0;
 			transparentCommand = 0;
 			_transparentSort = SortTransparent;
+            this.rstate = rstate;
 		}
 		public void AddCommand(RenderMaterial material, MaterialAnim anim, Matrix4 world, Lighting lights, VertexBuffer buffer, PrimitiveTypes primitive, int baseVertex, int start, int count, int layer, float z = 0)
 		{
@@ -62,19 +63,19 @@ namespace LibreLancer
 			}
 			else
 			{
-				Commands[currentCommand++] = new RenderCommand()
-				{
-					Source = material,
-					MaterialAnim = anim,
-					Lights = lights,
-					Buffer = buffer,
-					BaseVertex = baseVertex,
-					Start = start,
-					Count = count,
-					Primitive = primitive,
-					CmdType = RenderCmdType.Material,
-					World = world,
-				};
+                material.MaterialAnim = anim;
+                material.World = world;
+                material.Use(rstate, buffer.VertexType, ref lights);
+                buffer.Draw(primitive, baseVertex, start, count);
+                if (material.DoubleSided)
+                {
+                    material.FlipNormals = true;
+                    material.UpdateFlipNormals();
+                    rstate.CullFace = CullFaces.Front;
+                    buffer.Draw(primitive, baseVertex, start, count);
+                    rstate.CullFace = CullFaces.Back;
+                    material.FlipNormals = false;
+                }
 			}
 		}
 		//TODO: Implement MaterialAnim for asteroids
@@ -121,22 +122,7 @@ namespace LibreLancer
 			}
 			else
 			{
-				Commands[currentCommand++] = new RenderCommand()
-				{
-					Source = shader,
-					ShaderSetup = setup,
-					World = world,
-					UserData = user,
-					Cleanup = cleanup,
-					Buffer = buffer,
-					Lights = lt,
-					Start = start,
-					Count = count,
-					Primitive = primitive,
-					CmdType = RenderCmdType.Shader,
-					SortLayer = transparent ? layer : SortLayers.OPAQUE,
-					Z = z
-				};
+                throw new InvalidOperationException();
 			}
 		}
 		public void AddCommand(Shader shader, ShaderAction setup, Action<RenderState> cleanup, Matrix4 world, RenderUserData user, VertexBuffer buffer, PrimitiveTypes primitive, int baseVertex, int start, int count, bool transparent, int layer, float z = 0)
@@ -161,21 +147,7 @@ namespace LibreLancer
 			}
 			else
 			{
-				Commands[currentCommand++] = new RenderCommand()
-				{
-					Source = shader,
-					ShaderSetup = setup,
-					World = world,
-					UserData = user,
-					Cleanup = cleanup,
-					Buffer = buffer,
-					Start = start,
-					Count = count,
-					Primitive = primitive,
-					CmdType = RenderCmdType.Shader,
-					SortLayer = transparent ? layer : SortLayers.OPAQUE,
-					Z = z
-				};
+                throw new InvalidOperationException();
 			}
 		}
 		public void AddCommand(Shader shader, ShaderAction setup, Action<RenderState> cleanup, Matrix4 world, RenderUserData user, VertexBuffer buffer, PrimitiveTypes primitive, int start, int count, bool transparent, int layer, float z = 0)
@@ -201,22 +173,7 @@ namespace LibreLancer
 			}
 			else
 			{
-				Commands[currentCommand++] = new RenderCommand()
-				{
-					Source = shader,
-					ShaderSetup = setup,
-					World = world,
-					UserData = user,
-					Cleanup = cleanup,
-					Buffer = buffer,
-					Start = start,
-					Count = count,
-					Primitive = primitive,
-					CmdType = RenderCmdType.Shader,
-					BaseVertex = -1,
-					SortLayer = transparent ? layer : SortLayers.OPAQUE,
-					Z = z
-				};
+                throw new InvalidOperationException();
 			}
 		}
 		public void AddCommand(Billboards billboards, int hash, int index, int sortLayer, float z)
@@ -245,14 +202,25 @@ namespace LibreLancer
 				Z = z
 			};
 		}
-		bool _sorted = false;
 		public void DrawOpaque(RenderState state)
 		{
-			_sorted = false;
-			AsyncManager.RunTask (_transparentSort);
-			for (int i = 0; i < currentCommand; i++)
+            //_sorted = false;
+            //_filled = false;
+            //AsyncManager.RunTask (_transparentSort);
+            SortTransparent();
+            FillBillboards();
+		}
+
+		void FillBillboards()
+		{
+			for (int i = transparentCommand - 1; i >= 0; i--)
 			{
-				Commands[i].Run(state);
+				if (Transparents[cmdptr[i]].CmdType == RenderCmdType.Billboard)
+				{
+					var bb = (Billboards)Transparents[cmdptr[i]].Source;
+					bb.FillIbo();
+					break;
+				}
 			}
 		}
 
@@ -263,30 +231,26 @@ namespace LibreLancer
 				cmdptr[i] = i;
 			}
 			Array.Sort<int>(cmdptr, 0, transparentCommand, new ZComparer(Transparents));
-			//transparentCount = a;
-			_sorted = true;
+			for (int i = transparentCommand - 1; i >= 0; i--)
+			{
+				if (Transparents[cmdptr[i]].CmdType == RenderCmdType.Billboard)
+				{
+					var bb = (Billboards)Transparents[cmdptr[i]].Source;
+					bb.AddIndices(Transparents[cmdptr[i]].Index);
+				}
+				if (Transparents[cmdptr[i]].CmdType == RenderCmdType.BillboardCustom)
+				{
+					var bb = (Billboards)Transparents[cmdptr[i]].Source;
+					bb.AddCustomIndices(Transparents[cmdptr[i]].Index);
+				}
+			}
 		}
 
 		int[] cmdptr = new int[MAX_COMMANDS];
 		int transparentCount = 0;
 		public void DrawTransparent(RenderState state)
 		{
-			while (!_sorted) {
-			}
-            for (int i = transparentCommand - 1; i >= 0; i--)
-            {
-                if(Transparents[cmdptr[i]].CmdType == RenderCmdType.Billboard)
-                {
-					var bb = (Billboards)Transparents[cmdptr[i]].Source;
-                    bb.AddIndices(Transparents[cmdptr[i]].Index);
-                }
-				if (Transparents[cmdptr[i]].CmdType == RenderCmdType.BillboardCustom)
-				{
-					var bb = (Billboards)Transparents[cmdptr[i]].Source;
-					bb.AddCustomIndices(Transparents[cmdptr[i]].Index);
-				}
-            }
-            Billboards lastbb = null;
+		  	Billboards lastbb = null;
 			for (int i = transparentCommand - 1; i >= 0; i--)
 			{
 				if (lastbb != null && Transparents[cmdptr[i]].CmdType != RenderCmdType.Billboard && Transparents[cmdptr[i]].CmdType != RenderCmdType.BillboardCustom)
@@ -367,21 +331,22 @@ namespace LibreLancer
 					Material.FadeNear = *(float*)(&fn);
 					Material.FadeFar = *(float*)(&ff);
 				}
-				Material.Use(state, Buffer.VertexType, Lights);
+				Material.Use(state, Buffer.VertexType, ref Lights);
 				if (!Fade && BaseVertex != -1)
 					Buffer.Draw(Primitive, BaseVertex, Start, Count);
 				else
 					Buffer.Draw(Primitive, Count);
 				if (Material.DoubleSided)
 				{
-					Material.FlipNormals = true;
+                    Material.FlipNormals = true;
+                    Material.UpdateFlipNormals();
 					state.CullFace = CullFaces.Front;
 					if (!Fade && BaseVertex != -1)
 						Buffer.Draw(Primitive, BaseVertex, Start, Count);
 					else
 						Buffer.Draw(Primitive, Count);
-					Material.FlipNormals = false;
 					state.CullFace = CullFaces.Back;
+                    Material.FlipNormals = false;
 				}
 				if (Fade)
 				{

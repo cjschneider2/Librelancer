@@ -38,7 +38,7 @@ namespace LibreLancer.Utf.Cmp
         private ILibFile additionalLibrary;
         private bool ready;
 
-        public string Path { get; private set; }
+        public string Path { get; set; }
 
         public VmsFile VMeshLibrary { get; private set; }
         public MatFile MaterialLibrary { get; private set; }
@@ -215,28 +215,39 @@ namespace LibreLancer.Utf.Cmp
 		{
 			return Levels[0].Radius;
 		}
-		public void DrawBuffer(CommandBuffer buffer, Matrix4 world, Lighting light)
+		public void DrawBuffer(CommandBuffer buffer, Matrix4 world, ref Lighting light, Material overrideMat = null)
 		{
 			if (ready)
 			{
 				var ma = MaterialAnim;
 				if (ma == null && additionalLibrary is CmpFile)
 					ma = ((CmpFile)additionalLibrary).MaterialAnim;
-				Levels[0].DrawBuffer(buffer, world, light, ma);
+				Levels[0].DrawBuffer(buffer, world, ref light, ma, overrideMat);
 			}
 		}
 
-        public void DrawBufferLevel(VMeshRef level, CommandBuffer buffer, Matrix4 world, Lighting light)
+        public void DrawBufferLevel(VMeshRef level, CommandBuffer buffer, Matrix4 world, ref Lighting light)
         {
             if (ready)
             {
                 var ma = MaterialAnim;
                 if (ma == null && additionalLibrary is CmpFile)
                     ma = ((CmpFile)additionalLibrary).MaterialAnim;
-                level.DrawBuffer(buffer, world, light, ma);
+                level.DrawBuffer(buffer, world, ref light, ma);
             }
         }
-        
+
+		public void DepthPrepassLevel(VMeshRef level, RenderState rstate, Matrix4 world)
+		{
+			if (ready)
+			{
+				var ma = MaterialAnim;
+				if (ma == null && additionalLibrary is CmpFile)
+					ma = ((CmpFile)additionalLibrary).MaterialAnim;
+				level.DepthPrepass(rstate, world, ma);
+			}
+		}
+
 		public void Draw(RenderState rstate, Matrix4 world, Lighting light)
         {
 			if (ready) {

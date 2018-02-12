@@ -21,14 +21,15 @@ namespace LibreLancer.Fx
 	public class FxAppearance : FxNode
 	{
 		public PhysicsDebugRenderer Debug;
+		public bool DrawNormals = false;
 		public FxAppearance (AlchemyNode ale) : base(ale)
 		{
 		}
-		public virtual void Draw(ref Particle particle, float globaltime, ParticleEffect effect, ResourceManager res, Billboards billboards, ref Matrix4 transform, float sparam)
+		public virtual void Draw(ref Particle particle, float globaltime, NodeReference reference, ResourceManager res, Billboards billboards, ref Matrix4 transform, float sparam)
 		{
 			
 		}
-		public virtual void OnParticleSpawned(int idx, ParticleEffectInstance instance)
+		public virtual void OnParticleSpawned(int idx, NodeReference reference, ParticleEffectInstance instance)
 		{
 		}
 	}

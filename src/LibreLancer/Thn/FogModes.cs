@@ -18,10 +18,10 @@ namespace LibreLancer
 {
 	public enum FogModes
 	{
-		None = 0,
-		Linear = 1,
-		Exp = 2,
-		Exp2 = 3
+		None = 0, //NOTE: THIS IS HARDCODED IN THE LIGHTING.INC SHADER
+		Linear = 3,
+		Exp = 1,
+		Exp2 = 2
 	}
 }
 

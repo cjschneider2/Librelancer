@@ -15,8 +15,14 @@
  */
 using System;
 
+
 namespace LibreLancer
 {
+	public enum DepthFunction
+	{
+		Less = 0x201,
+		LessEqual = 0x203
+	}
 	//OpenGL Render States
 	public class RenderState
 	{
@@ -77,6 +83,14 @@ namespace LibreLancer
 					return;
 				blendDirty = true;
 				blend = value;
+			}
+		}
+
+		public DepthFunction DepthFunction
+		{
+			set
+			{
+				GL.DepthFunc((int)value);
 			}
 		}
 
@@ -165,6 +179,10 @@ namespace LibreLancer
 
 			if (wireframeDirty) {
 				GL.PolygonMode (GL.GL_FRONT_AND_BACK, isWireframe ? GL.GL_LINE : GL.GL_FILL);
+				if (isWireframe)
+					GL.LineWidth(1.7f);
+				else
+					GL.LineWidth(1);
 				wireframeDirty = false;
 			}
 

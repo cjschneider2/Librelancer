@@ -310,6 +310,7 @@ namespace LibreLancer
 				blend,
 				(ushort)vertexCount
 			);
+			//construct points then billboard them?
 			CreateBillboard(
 				Position,
 				size,
@@ -535,6 +536,16 @@ namespace LibreLancer
 			datindex = index;
 			var dat = rendat[index];
 			indexCount += dat.Tri ? 3 : 6;
+		}
+
+		public void FillIbo()
+		{
+			if (!_iboFilled)
+			{
+				ibo.SetData(indices, fillCount);
+				_iboFilled = true;
+				fillCount = 0;
+			}
 		}
 
 		bool _frameStart = true;

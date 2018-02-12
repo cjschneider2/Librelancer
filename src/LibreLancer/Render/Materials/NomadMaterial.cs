@@ -1,4 +1,19 @@
-﻿using System;
+﻿/* The contents of this file are subject to the Mozilla Public License
+ * Version 1.1 (the "License"); you may not use this file except in
+ * compliance with the License. You may obtain a copy of the License at
+ * http://www.mozilla.org/MPL/
+ * 
+ * Software distributed under the License is distributed on an "AS IS"
+ * basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See the
+ * License for the specific language governing rights and limitations
+ * under the License.
+ * 
+ * 
+ * The Initial Developer of the Original Code is Callum McGing (mailto:callum.mcging@gmail.com).
+ * Portions created by the Initial Developer are Copyright (C) 2013-2017
+ * the Initial Developer. All Rights Reserved.
+ */
+using System;
 using LibreLancer.Vertices;
 using LibreLancer.Utf.Mat;
 namespace LibreLancer
@@ -11,6 +26,9 @@ namespace LibreLancer
 
 		public string BtSampler;
 		public SamplerFlags BtFlags;
+
+		public string NtSampler;
+		public SamplerFlags NtFlags;
 
 		public float Oc = 1f;
 
@@ -37,6 +55,12 @@ namespace LibreLancer
 			throw new NotImplementedException(vertexType.GetType().Name);
 		}
 
+
+		public override void ApplyDepthPrepass(RenderState rstate)
+		{
+			throw new InvalidOperationException();
+		}
+
 		public override bool IsTransparent
 		{
 			get
@@ -45,7 +69,7 @@ namespace LibreLancer
 			}
 		}
 
-		public override void Use(RenderState rstate, IVertexType vertextype, Lighting lights)
+		public override void Use(RenderState rstate, IVertexType vertextype, ref Lighting lights)
 		{
 			rstate.BlendMode = BlendMode.Normal;
 			var shader = GetShader(vertextype);
@@ -58,9 +82,11 @@ namespace LibreLancer
 			//Dt
 			shader.SetDtSampler(0);
 			BindTexture(rstate, 0, DtSampler, 0, DtFlags);
+			//Nt
+			shader.SetDmSampler(1); //Repurpose DmSampler
+			BindTexture(rstate, 1, NtSampler ?? "NomadRGB1_NomadAlpha1", 1, NtFlags);
 			//Bt
-			shader.SetEtSampler(1);
-			BindTexture(rstate, 1, BtSampler, 1, BtFlags);
+
 			//Disable MaterialAnim
 			shader.SetMaterialAnim(new Vector4(0, 0, 1, 1));
 			shader.UseProgram();

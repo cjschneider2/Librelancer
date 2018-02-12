@@ -46,7 +46,7 @@ namespace LibreLancer
 			}
 			throw new NotImplementedException ();
 		}
-		public override void Use (RenderState rstate, IVertexType vertextype, Lighting lights)
+		public override void Use (RenderState rstate, IVertexType vertextype, ref Lighting lights)
 		{
 			rstate.DepthEnabled = true;
 			rstate.BlendMode = BlendMode.Opaque;
@@ -65,13 +65,22 @@ namespace LibreLancer
 			BindTexture (rstate ,0, DtSampler, 0, DtFlags);
 			sh.SetDm1Sampler(1);
 			BindTexture (rstate, 1, Dm1Sampler, 1, Dm1Flags);
-			SetLights(sh, lights);
+			SetLights(sh, ref lights);
 			var normalMatrix = World;
 			normalMatrix.Invert();
 			normalMatrix.Transpose();
 			sh.SetNormalMatrix(ref normalMatrix);
 			sh.UseProgram ();
 		}
+
+		public override void ApplyDepthPrepass(RenderState rstate)
+		{
+			rstate.BlendMode = BlendMode.Normal;
+			NormalPrepassShader.SetWorld(ref World);
+			NormalPrepassShader.SetViewProjection(Camera);
+			NormalPrepassShader.UseProgram();
+		}
+
 		public override bool IsTransparent
 		{
 			get

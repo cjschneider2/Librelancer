@@ -19,14 +19,10 @@ using System.Collections.Generic;
 using LibreLancer.Utf;
 using LibreLancer.Utf.Mat;
 using LibreLancer.Utf.Cmp;
-using LibreLancer.Sur;
+using LibreLancer.Physics;
 using LibreLancer.GameData;
 using LibreLancer.GameData.Items;
 using Archs = LibreLancer.GameData.Archetypes;
-using Jitter;
-using Jitter.LinearMath;
-using Jitter.Collision.Shapes;
-using Jitter.Dynamics;
 
 namespace LibreLancer
 {
@@ -41,14 +37,15 @@ namespace LibreLancer
 		{
 			get
 			{
+                if (PhysicsComponent != null && PhysicsComponent.Body != null)
+                    return PhysicsComponent.Body.Transform;
 				return _transform;
 			} set
 			{
 				_transform = value;
-				if (PhysicsComponent != null)
+				if (PhysicsComponent != null && PhysicsComponent.Body != null)
 				{
-					PhysicsComponent.Position = _transform.ExtractTranslation().ToJitter();
-					PhysicsComponent.Orientation = _transform.GetOrientation();
+                    PhysicsComponent.Body.SetTransform(value);
 				}
 			}
 		}
@@ -63,8 +60,9 @@ namespace LibreLancer
 		public List<GameObject> Children = new List<GameObject>();
 		public List<GameComponent> Components = new List<GameComponent>();
 		public ObjectRenderer RenderComponent;
-		public RigidBody PhysicsComponent;
+		public PhysicsComponent PhysicsComponent;
 		public AnimationComponent AnimationComponent;
+		public SystemObject SystemObject;
 
 		public GameObject(Archetype arch, ResourceManager res, bool staticpos = false)
 		{
@@ -73,9 +71,9 @@ namespace LibreLancer
 			{
 				RenderComponent = new SunRenderer((Archs.Sun)arch);
 				//TODO: You can't collide with a sun
-				PhysicsComponent = new RigidBody(new SphereShape((((Archs.Sun)arch).Radius)));
-				PhysicsComponent.IsStatic = true;
-				PhysicsComponent.Tag = this;
+				//PhysicsComponent = new RigidBody(new SphereShape((((Archs.Sun)arch).Radius)));
+				//PhysicsComponent.IsStatic = true;
+				//PhysicsComponent.Tag = this;
 			}
 			else
 			{
@@ -88,37 +86,41 @@ namespace LibreLancer
 		}
 		public GameObject(IDrawable drawable, ResourceManager res, bool staticpos = false)
 		{
-			isstatic = staticpos;
+			isstatic = false;
 			InitWithDrawable(drawable, res, staticpos);
 		}
+        public GameObject(Ship ship, ResourceManager res)
+        {
+            InitWithDrawable(ship.Drawable, res, false);
+            PhysicsComponent.Mass = ship.Mass;
+            PhysicsComponent.Inertia = ship.RotationInertia;
+        }
 		public void UpdateCollision()
 		{
-
+			if (PhysicsComponent == null) return;
+            PhysicsComponent.UpdateParts();
 		}
 		public ResourceManager Resources;
-		void InitWithDrawable(IDrawable drawable, ResourceManager res, bool staticpos)
+        void InitWithDrawable(IDrawable drawable, ResourceManager res, bool staticpos, bool havePhys = true)
 		{
 			Resources = res;
 			dr = drawable;
-			Shape collisionShape = null;
+            PhysicsComponent phys = null;
 			bool isCmp = false;
+            string name = "";
 			if (dr is SphFile)
 			{
 				var radius = ((SphFile)dr).Radius;
-				collisionShape = new SphereShape(radius);
+                phys = new PhysicsComponent(this) { SphereRadius = radius };
+                name = ((SphFile)dr).SideMaterialNames[0];
 			}
 			else if (dr is ModelFile)
 			{
 				var mdl = dr as ModelFile;
 				var path = Path.ChangeExtension(mdl.Path, "sur");
-				if (File.Exists(path))
-				{
-					SurFile sur = res.GetSur(path);
-					var shs = new List<CompoundSurShape.TransformedShape>();
-					foreach (var s in sur.GetShape(0))
-						shs.Add(new CompoundSurShape.TransformedShape(s, JMatrix.Identity, JVector.Zero));
-					collisionShape = new CompoundSurShape(shs);
-				}
+                name = Path.GetFileNameWithoutExtension(mdl.Path);
+                if (File.Exists(path))
+                    phys = new PhysicsComponent(this) { SurPath = path };
 			}
 			else if (dr is CmpFile)
 			{
@@ -136,7 +138,10 @@ namespace LibreLancer
 					Components.Add(AnimationComponent);
 				}
 				var path = Path.ChangeExtension(cmp.Path, "sur");
-				if (File.Exists(path))
+                name = Path.GetFileNameWithoutExtension(cmp.Path);
+                if (File.Exists(path))
+                    phys = new PhysicsComponent(this) { SurPath = path };
+                /*if (File.Exists(path))
 				{
 					SurFile sur = res.GetSur(path);
 					var shapes = new List<CompoundSurShape.TransformedShape>();
@@ -152,33 +157,31 @@ namespace LibreLancer
 						if (part.Construct == null)
 						{
 							foreach (var s in colshape)
-								shapes.Add(new CompoundSurShape.TransformedShape(s, JMatrix.Identity, JVector.Zero));						}
+								shapes.Add(new CompoundSurShape.TransformedShape(s, Matrix3.Identity, Vector3.Zero));						}
 						else
 						{
 							var tr = part.Construct.Transform;
-							var pos = tr.ExtractTranslation().ToJitter();
+							var pos = tr.ExtractTranslation();
 							var q = tr.ExtractRotation(true);
-							var rot = JMatrix.CreateFromQuaternion(new JQuaternion(q.X, q.Y, q.Z, q.W));
+							var rot = Matrix3.CreateFromQuaternion(q);
 							foreach (var s in colshape)
 								shapes.Add(new CompoundSurShape.TransformedShape(s, rot, pos) { Tag = part.Construct });
 						}
 					}
 					collisionShape = new CompoundSurShape(shapes);
-				}
+				}*/
 			}
-			if (collisionShape != null)
-			{
-				PhysicsComponent = new RigidBody(collisionShape);
-				PhysicsComponent.Tag = this;
-				PhysicsComponent.IsStatic = staticpos;
-				if (staticpos)
-					PhysicsComponent.Material.Restitution = 1;
-			}
+
+            if (havePhys && phys != null)
+            {
+                PhysicsComponent = phys;
+                Components.Add(phys);
+            }
 			PopulateHardpoints(dr);
 			if (isCmp)
-				RenderComponent = new ModelRenderer(CmpParts, (dr as CmpFile));
+                RenderComponent = new ModelRenderer(CmpParts, (dr as CmpFile)) { Name = name };
 			else
-				RenderComponent = new ModelRenderer(dr);
+                RenderComponent = new ModelRenderer(dr) { Name = name };
 		}
 
 		public GameObject(Equipment equip, Hardpoint hp, GameObject parent)
@@ -196,9 +199,47 @@ namespace LibreLancer
 			if (equip is ThrusterEquipment)
 			{
 				var th = (ThrusterEquipment)equip;
-				InitWithDrawable(th.Model, parent.Resources, false);
+				InitWithDrawable(th.Model, parent.Resources, false, false);
 				Components.Add(new ThrusterComponent(this, th));
 			}
+            if (equip is GunEquipment)
+            {
+                var gn = (GunEquipment)equip;
+                InitWithDrawable(gn.Model, parent.Resources,false, false);
+                Components.Add(new WeaponComponent(this, gn));
+            }
+            if (equip.LODRanges != null && RenderComponent != null) RenderComponent.LODRanges = equip.LODRanges;
+            if(equip.HPChild != null) {
+                if (hardpoints.TryGetValue(equip.HPChild, out Hardpoint hpchild))
+                {
+                    Transform = hpchild.Transform.Inverted();
+                }
+            }
+            if(RenderComponent is ModelRenderer &&
+                parent.RenderComponent != null
+              )
+            {
+                if (parent.RenderComponent.LODRanges != null)
+                {
+                    RenderComponent.InheritCull = parent.RenderComponent.LODRanges[1];
+                }
+                else if (parent.RenderComponent is ModelRenderer)
+                {
+                    var mr = (ModelRenderer)parent.RenderComponent;
+                    if (mr.Model != null && mr.Model.Switch2 != null)
+                        RenderComponent.InheritCull = mr.Model.Switch2[1];
+                    if(mr.CmpParts != null)
+                    {
+                        Part parentPart = null;
+                        if (hp.parent != null)
+                            parentPart = mr.CmpParts.Find((o) => o.ObjectName == hp.parent.ChildName);
+                        else
+                            parentPart = mr.CmpParts.Find((o) => o.ObjectName == "Root");
+                        if (parentPart.Model.Switch2 != null)
+                            RenderComponent.InheritCull = parentPart.Model.Switch2[1];
+                    }
+                }
+            }
             //Optimisation: Don't re-calculate transforms every frame for static objects
             if(parent.isstatic && hp.IsStatic)
             {
@@ -267,10 +308,6 @@ namespace LibreLancer
 
 		public void Update(TimeSpan time)
 		{
-			if (PhysicsComponent != null && !isstatic)
-			{
-				Transform = PhysicsComponent.Orientation.ToOpenTK() * Matrix4.CreateTranslation(PhysicsComponent.Position.ToOpenTK());
-			}
 			if (RenderComponent != null)
 			{
 				var tr = GetTransform();
@@ -288,37 +325,71 @@ namespace LibreLancer
 				Children[i].FixedUpdate(time);
 			for (int i = 0; i < Components.Count; i++)
 				Components[i].FixedUpdate(time);
+            if (!isstatic && PhysicsComponent != null && PhysicsComponent.Body != null)
+			{
+                Transform = PhysicsComponent.Body.Transform;
+			}
 		}
 
-		public void Register(SystemRenderer renderer, World physics)
+		public void Register(PhysicsWorld physics)
 		{
-			if(RenderComponent != null)
-				RenderComponent.Register(renderer);
-			if (PhysicsComponent != null)
-				physics.AddBody(PhysicsComponent);
 			foreach (var child in Children)
-				child.Register(renderer, physics);
+				child.Register(physics);
 			foreach (var component in Components)
-				component.Register(renderer, physics);
+				component.Register(physics);
 		}
 
-		public void Unregister(World physics)
+		public GameWorld World;
+
+		public GameWorld GetWorld()
 		{
-			if(RenderComponent != null)
-				RenderComponent.Unregister();
-			if (PhysicsComponent != null)
-				physics.RemoveBody(PhysicsComponent);
+			if (World == null) return Parent.GetWorld();
+			return World;
+		}
+
+        public void PrepareRender(ICamera camera, NebulaRenderer nr, SystemRenderer sys)
+        {
+            if(RenderComponent == null || RenderComponent.PrepareRender(camera,nr,sys))
+            {
+                foreach (var child in Children)
+                    child.PrepareRender(camera, nr, sys);
+            }
+            foreach (var child in ForceRenderCheck)
+                child.PrepareRender(camera, nr, sys);
+        }
+
+        public List<ObjectRenderer> ForceRenderCheck = new List<ObjectRenderer>();
+
+		public void Unregister(PhysicsWorld physics)
+		{
+            foreach (var component in Components)
+                component.Unregister(physics);
 			foreach (var child in Children)
 				child.Unregister(physics);
 		}
+
+		public bool HardpointExists(string hpname)
+		{
+			return hardpoints.ContainsKey(hpname);
+		}
+
 		public Hardpoint GetHardpoint(string hpname)
 		{
 			return hardpoints[hpname];
 		}
+
+		public Vector3 InverseTransformPoint(Vector3 input)
+		{
+			var tf = GetTransform();
+			tf.Invert();
+			return VectorMath.Transform(input, tf);
+		}
+
 		public IEnumerable<Hardpoint> GetHardpoints()
 		{
 			return hardpoints.Values;
 		}
+
 		public Matrix4 GetTransform()
 		{
 			if (isstatic)
@@ -329,6 +400,11 @@ namespace LibreLancer
 			if (Parent != null)
 				tr *= Parent.GetTransform();
 			return tr;
+		}
+
+		public override string ToString()
+		{
+			return string.Format("[{0}: {1}]", Nickname, Name);
 		}
 	}
 }

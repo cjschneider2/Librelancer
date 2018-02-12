@@ -23,7 +23,7 @@ using LibreLancer.Utf.Vms;
 
 namespace LibreLancer.Utf.Mat
 {
-	public class TxmFile : UtfFile, ILibFile
+	public class TxmFile : UtfFile
 	{
 		public Dictionary<string, TextureData> Textures { get; private set; }
 		public Dictionary<string, TexFrameAnimation> Animations { get; private set; }
@@ -31,25 +31,6 @@ namespace LibreLancer.Utf.Mat
         {
             Textures = new Dictionary<string, TextureData>();
 			Animations = new Dictionary<string, TexFrameAnimation>();
-        }
-
-        public TxmFile(string path)
-            : this()
-        {
-            foreach (Node node in parseFile(path))
-            {
-                switch (node.Name.ToLowerInvariant())
-                {
-                    case "texture library":
-                        IntermediateNode textureLibraryNode = node as IntermediateNode;
-                        setTextures(textureLibraryNode);
-                        break;
-                    case "exporter version":
-                        break;
-                    default:
-                        throw new Exception("Invalid node in txm root: " + node.Name);
-                }
-            }
         }
 
         public TxmFile(IntermediateNode textureLibraryNode)
@@ -116,26 +97,6 @@ namespace LibreLancer.Utf.Mat
 					Animations.Add(textureNode.Name, new TexFrameAnimation(textureNode));
 				}
             }
-        }
-
-        public Texture FindTexture(string name)
-        {
-			return null;
-        }
-
-        public Material FindMaterial(uint materialId)
-        {
-            return null;
-        }
-
-        public Material FindMaterial(string name)
-        {
-            return null;
-        }
-
-        public VMeshData FindMesh(uint vMeshLibId)
-        {
-            return null;
         }
     }
 }

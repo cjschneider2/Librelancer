@@ -37,7 +37,8 @@ namespace LibreLancer.Ini
 			if (path == null) throw new ArgumentNullException("path");
 
 			List<Section> sections = new List<Section>();
-
+			if (!path.ToLowerInvariant().EndsWith(".ini"))
+				path = path + ".ini";
 			using (Stream stream = VFS.Open(path))
 			{
 				byte[] buffer = new byte[4];
@@ -105,6 +106,7 @@ namespace LibreLancer.Ini
 							}
 							else if (line.Contains("="))
 							{
+								
 								string[] parts = line.Split(new char[] { '=' }, StringSplitOptions.RemoveEmptyEntries);
 								if (parts.Length == 2) {
 									string val = parts [1].TrimStart ();

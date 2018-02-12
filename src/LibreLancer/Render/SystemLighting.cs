@@ -25,5 +25,6 @@ namespace LibreLancer
 		public float FogDensity = 0f;
 		public Color4 FogColor = Color4.Black;
 		public Vector2 FogRange = Vector2.Zero;
+		public int NumberOfTilesX;
 	}
 }

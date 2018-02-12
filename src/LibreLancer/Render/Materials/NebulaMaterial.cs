@@ -42,7 +42,7 @@ namespace LibreLancer
 				throw new NotImplementedException ();
 			}
 		}
-		public override void Use(RenderState rstate, IVertexType vertextype, Lighting lights)
+		public override void Use(RenderState rstate, IVertexType vertextype, ref Lighting lights)
 		{
             if (Camera == null)
                 return;
@@ -56,6 +56,12 @@ namespace LibreLancer
 			BindTexture (rstate, 0, DtSampler, 0, DtFlags);
 			shader.UseProgram ();
 		}
+
+		public override void ApplyDepthPrepass(RenderState rstate)
+		{
+			throw new InvalidOperationException();
+		}
+
 		public override bool IsTransparent
 		{
 			get

@@ -1,0 +1,24 @@
+language: csharp
+addons:
+  apt:
+    sources:
+    - deadsnakes
+    - ubuntu-toolchain-r-test
+    packages:
+    - gcc-4.9
+    - g++-4.9
+    - cmake
+script:
+ - ./slngen.unix
+ - nuget restore src/LibreLancer.Linux.sln
+ - xbuild /p:Configuration=Release src/LibreLancer.Linux.sln
+ - packaging/package_linux_daily
+deploy:
+    provider: pages
+    skip-cleanup: true
+    github-token: $GITHUB_TOKEN
+    keep-history: true
+    on:
+        branch: master
+    local-dir: packaging/packages
+    repo: Librelancer/daily-builds

@@ -19,68 +19,68 @@ using System.Collections.Generic;
 using LibreLancer.Utf.Vms;
 using LibreLancer.Utf.Mat;
 using LibreLancer.Utf.Cmp;
-using LibreLancer.Sur;
+using LibreLancer.Utf.Dfm;
 namespace LibreLancer
 {
 	//TODO: Allow for disposing and all that Jazz
 	public class ResourceManager : ILibFile
 	{
-		public FreelancerGame Game;
+		public Game Game;
 
 		Dictionary<uint, VMeshData> meshes = new Dictionary<uint, VMeshData>();
 		Dictionary<uint, Material> materials = new Dictionary<uint, Material>();
+		Dictionary<uint, string> materialfiles = new Dictionary<uint, string>();
 		Dictionary<string, Texture> textures = new Dictionary<string, Texture>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, string> texturefiles = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, CmpFile> cmps = new Dictionary<string, CmpFile>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, ModelFile> models = new Dictionary<string, ModelFile>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, SphFile> sphs = new Dictionary<string, SphFile>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, VmsFile> vmss = new Dictionary<string, VmsFile>(StringComparer.OrdinalIgnoreCase);
+		Dictionary<string, IDrawable> drawables = new Dictionary<string, IDrawable>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, TextureShape> shapes = new Dictionary<string, TextureShape>(StringComparer.OrdinalIgnoreCase);
-		Dictionary<string, SurFile> surs = new Dictionary<string, SurFile>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, Cursor> cursors = new Dictionary<string, Cursor>(StringComparer.OrdinalIgnoreCase);
 		Dictionary<string, TexFrameAnimation> frameanims = new Dictionary<string, TexFrameAnimation>(StringComparer.OrdinalIgnoreCase);
-
-		List<string> loadedMatFiles = new List<string>();
-		List<string> loadedTxmFiles = new List<string>();
+		List<string> loadedResFiles = new List<string>();
 		List<string> preloadFiles = new List<string>();
 
-		public ResourceManager(FreelancerGame g)
+		public Dictionary<string, Texture> TextureDictionary
+		{
+			get
+			{
+				return textures;
+			}
+		}
+		public Dictionary<uint, Material> MaterialDictionary
+		{
+			get
+			{
+				return materials;
+			}
+		}
+		public ResourceManager(Game g) : this()
 		{
 			Game = g;
-			NullTexture = new Texture2D(1, 1, false, SurfaceFormat.Color);
-			NullTexture.SetData(new byte[] { 0xFF, 0xFF, 0xFF, 0x0 });
+			DefaultMaterial = new Material(this);
+			DefaultMaterial.Name = "$LL_DefaultMaterialName";
 		}
 
+		public Material DefaultMaterial;
 		public Texture2D NullTexture;
+		public Texture2D WhiteTexture;
 		public const string NullTextureName = "$$LIBRELANCER.Null";
+		public const string WhiteTextureName = "$$LIBRELANCER.White";
 		public ResourceManager()
 		{
+			NullTexture = new Texture2D(1, 1, false, SurfaceFormat.Color);
+			NullTexture.SetData(new byte[] { 0xFF, 0xFF, 0xFF, 0x0 });
+
+			WhiteTexture = new Texture2D(1, 1, false, SurfaceFormat.Color);
+			WhiteTexture.SetData(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF });
 		}
 
 		public void Preload()
 		{
 			foreach (var file in preloadFiles)
 			{
-				if (file.ToLowerInvariant().EndsWith(".mat"))
-					LoadMat(file);
-				if (file.ToLowerInvariant().EndsWith(".txm"))
-					LoadTxm(file);
+				LoadResourceFile(file);
 			}
 			preloadFiles = null;
-		}
-
-		public SurFile GetSur(string filename)
-		{
-			SurFile sur;
-			if (!surs.TryGetValue(filename, out sur))
-			{
-				using (var stream = File.OpenRead(filename))
-				{
-					sur = new SurFile(stream);
-				}
-				surs.Add(filename, sur);
-			}
-			return sur;
 		}
 
 		public Cursor GetCursor(string name)
@@ -115,7 +115,7 @@ namespace LibreLancer
 
 		public bool TextureExists(string name)
 		{
-			return texturefiles.ContainsKey(name) || name == NullTextureName;
+			return texturefiles.ContainsKey(name) || name == NullTextureName || name == WhiteTextureName;
 		}
 
 		public void AddTexture(string name,string filename)
@@ -143,39 +143,16 @@ namespace LibreLancer
 		{
 			if (name == NullTextureName)
 				return NullTexture;
+			if (name == WhiteTextureName)
+				return WhiteTexture;
             Texture outtex;
-			if ((outtex = textures[name]) == null)
+			if (!textures.TryGetValue(name, out outtex))
+				return null;
+			if (outtex == null)
 			{
 				var file = texturefiles[name];
 				FLLog.Debug("Resources", string.Format("Reloading {0} from {1}", name, file));
-				if (file.EndsWith(".mat", StringComparison.OrdinalIgnoreCase))
-				{
-					loadedMatFiles.Remove(file);
-					LoadMat(file);
-				}
-				else if (file.EndsWith(".cmp", StringComparison.OrdinalIgnoreCase))
-				{
-					var c = new CmpFile(file, this);
-					if (c.MaterialLibrary != null)
-						AddMaterials(c.MaterialLibrary, file);
-					AddTextures(c.TextureLibrary, file);
-				}
-				else if (file.EndsWith(".3db", StringComparison.OrdinalIgnoreCase))
-				{
-					var m = new ModelFile(file, this);
-					if (m.MaterialLibrary != null)
-						AddMaterials(m.MaterialLibrary, file);
-					AddTextures(m.TextureLibrary, file);
-				}
-				else if (file.EndsWith(".txm", StringComparison.OrdinalIgnoreCase))
-				{
-					loadedTxmFiles.Remove(file);
-					LoadTxm(file);
-				}
-				else
-				{
-					textures[name] = ImageLib.Generic.FromFile(file);
-				}
+				LoadResourceFile(file);
                 outtex = textures[name];
 			}
             return outtex;
@@ -193,22 +170,55 @@ namespace LibreLancer
 			return meshes [vMeshLibId];
 		}
 
-		public void LoadMat(string filename)
+		public void AddResources(Utf.IntermediateNode node, string id)
 		{
-			if (loadedMatFiles.Contains (filename))
-				return;
-			var m = new MatFile (filename, this);
-			AddMaterials(m, filename);
-			loadedMatFiles.Add (filename);
+			MatFile mat;
+			TxmFile txm;
+			VmsFile vms;
+			Utf.UtfLoader.LoadResourceNode(node, this, out mat, out txm, out vms);
+			if (mat != null) AddMaterials(mat, id);
+			if (txm != null) AddTextures(txm, id);
+			if (vms != null) AddMeshes(vms);
 		}
 
-		public void LoadTxm(string filename)
+		public void RemoveResourcesForId(string id)
 		{
-			if (loadedTxmFiles.Contains (filename))
-				return;
-			var t = new TxmFile (filename);
-			AddTextures(t, filename);
-			loadedTxmFiles.Add (filename);
+			List<string> removeTex = new List<string>();
+			foreach (var tex in textures)
+			{
+				if (texturefiles[tex.Key] == id)
+				{
+					texturefiles.Remove(tex.Key);
+					tex.Value.Dispose();
+					removeTex.Add(tex.Key);
+				}
+			}
+			foreach (var key in removeTex) textures.Remove(key);
+			List<uint> removeMats = new List<uint>();
+			foreach (var mat in materials)
+			{
+				if (materialfiles[mat.Key] == id)
+				{
+					materialfiles.Remove(mat.Key);
+					mat.Value.Loaded = false;
+					removeMats.Add(mat.Key);
+				}
+			}
+			foreach (var key in removeMats) materials.Remove(key);
+		}
+
+
+
+		public void LoadResourceFile(string filename)
+		{
+			MatFile mat;
+			TxmFile txm;
+			VmsFile vms;
+			Utf.UtfLoader.LoadResourceFile(filename, this, out mat, out txm, out vms);
+			if (mat != null) AddMaterials(mat, filename);
+			if (txm != null) AddTextures(txm, filename);
+			if (vms != null) AddMeshes(vms);
+			if (vms == null && mat == null && txm == null) throw new Exception("Not a resource file " + filename);
 		}
 
 		void AddTextures(TxmFile t, string filename)
@@ -243,8 +253,11 @@ namespace LibreLancer
 				AddTextures(m.TextureLibrary, filename);
 			}
 			foreach (var kv in m.Materials) {
-				if(!materials.ContainsKey(kv.Key))
-					materials.Add (kv.Key, kv.Value);
+				if (!materials.ContainsKey(kv.Key))
+				{
+					materials.Add(kv.Key, kv.Value);
+					materialfiles.Add(kv.Key, filename);
+				}
 			}
 		}
 		void AddMeshes(VmsFile vms)
@@ -256,69 +269,41 @@ namespace LibreLancer
 		}
 		public IDrawable GetDrawable(string filename)
 		{
-			if (filename.EndsWith(".cmp", StringComparison.OrdinalIgnoreCase))
-				return GetCmp(filename);
-			if (filename.EndsWith (".3db", StringComparison.OrdinalIgnoreCase))
-				return GetModel (filename);
-			if (filename.EndsWith (".sph", StringComparison.OrdinalIgnoreCase))
-				return GetSph (filename);
-
-			return GetCmp (filename + ".cmp");
-		}
-
-		public SphFile GetSph(string filename)
-		{
-			if (!sphs.ContainsKey (filename)) {
-				var file = new SphFile (filename, this);
-				sphs.Add (filename, file);
+			IDrawable drawable;
+			if (!drawables.TryGetValue(filename, out drawable))
+			{
+				drawable = Utf.UtfLoader.LoadDrawable(filename, this);
+				drawable.Initialize(this);
+				if (drawable is CmpFile) /* Get Resources */
+				{
+					var cmp = (CmpFile)drawable;
+					if (cmp.MaterialLibrary != null) AddMaterials(cmp.MaterialLibrary, filename);
+					if (cmp.TextureLibrary != null) AddTextures(cmp.TextureLibrary, filename);
+					if (cmp.VMeshLibrary != null) AddMeshes(cmp.VMeshLibrary);
+				}
+				if (drawable is ModelFile)
+				{
+					var mdl = (ModelFile)drawable;
+					if (mdl.MaterialLibrary != null) AddMaterials(mdl.MaterialLibrary, filename);
+					if (mdl.TextureLibrary != null) AddTextures(mdl.TextureLibrary, filename);
+					if (mdl.VMeshLibrary != null) AddMeshes(mdl.VMeshLibrary);
+				}
+				if (drawable is DfmFile)
+				{
+					var dfm = (DfmFile)drawable;
+					if (dfm.MaterialLibrary != null) AddMaterials(dfm.MaterialLibrary, filename);
+					if (dfm.TextureLibrary != null) AddTextures(dfm.TextureLibrary, filename);
+				}
+				if (drawable is SphFile)
+				{
+					var sph = (SphFile)drawable;
+					if (sph.MaterialLibrary != null) AddMaterials(sph.MaterialLibrary, filename);
+					if (sph.TextureLibrary != null) AddTextures(sph.TextureLibrary, filename);
+					if (sph.VMeshLibrary != null) AddMeshes(sph.VMeshLibrary);
+				}
+				drawables.Add(filename, drawable);
 			}
-			return sphs [filename];
+			return drawable;
 		}
-
-		public CmpFile GetCmp(string filename)
-		{
-			if (!cmps.ContainsKey (filename)) {
-				var file = new CmpFile (filename, this);
-				if (file.TextureLibrary != null) {
-					AddTextures(file.TextureLibrary, filename);
-				}
-				if (file.MaterialLibrary != null) {
-					AddMaterials(file.MaterialLibrary, filename);
-				}
-				if (file.VMeshLibrary != null) {
-					AddMeshes (file.VMeshLibrary);
-				}
-				file.Initialize (this);
-				cmps.Add (filename, file);
-			}
-			return cmps [filename];
-		}
-		public void LoadVms(string filename)
-		{
-			if (!vmss.ContainsKey (filename)) {
-				var file = new VmsFile (filename, this);
-				AddMeshes (file);
-			}
-		}
-		public ModelFile GetModel(string filename)
-		{
-			if(!models.ContainsKey(filename)) {
-				var file = new ModelFile (filename, this);
-				if (file.TextureLibrary != null) {
-					AddTextures(file.TextureLibrary, filename);
-				}
-				if (file.MaterialLibrary != null) {
-					AddMaterials(file.MaterialLibrary, filename);
-				}
-				if (file.VMeshLibrary != null) {
-					AddMeshes (file.VMeshLibrary);
-				}
-				file.Initialize (this);
-				models.Add (filename, file);
-			}
-			return models [filename];
-		}
-
 	}
 }
-

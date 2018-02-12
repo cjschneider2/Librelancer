@@ -129,7 +129,7 @@ namespace LibreLancer
 			dot.SetData (new byte[] { 255 });
 		}
 
-		public Point MeasureString(Font font, string str)
+		public Point MeasureString(Font font, float size, string str)
 		{
 			if (str == "") //skip empty str
 				return new Point (0, 0);
@@ -137,6 +137,9 @@ namespace LibreLancer
 			float maxX = 0;
 			float maxY = 0;
 			float penX = 0, penY = 0;
+			var glyphs = font.GetGlyphs(size);
+			bool set = false;
+
 			while (iter.Iterate ()) {
 				uint c = iter.Codepoint;
                 if (c == (uint)'\r') //Skip CR in windows CRLF combo
@@ -144,12 +147,12 @@ namespace LibreLancer
                     continue;
                 }
 				if (c == (uint)'\n') {
-					penY += font.LineHeight;
+					penY += glyphs.LineHeight;
 					penX = 0;
 					maxY = 0;
 					continue;
 				}
-				var glyph = font.GetGlyph (c);
+				var glyph = glyphs.GetGlyph (c);
 				if (glyph.Render) {
 					penX += glyph.HorizontalAdvance;
 					penY += glyph.AdvanceY;
@@ -158,7 +161,8 @@ namespace LibreLancer
 					penY += glyph.AdvanceY;
 				}
 				if (glyph.Kerning && iter.Index < iter.Count - 1) {
-					var g2 = font.GetGlyph (iter.PeekNext ());
+					var g2 = glyphs.GetGlyph (iter.PeekNext ());
+					if (!set) { set = true; font.Face.SetCharSize(0, glyphs.Size, 0, 96); }
 					var kerning = font.Face.GetKerning (glyph.CharIndex, g2.CharIndex, KerningMode.Default);
 					penX += (float)kerning.X;
 				}
@@ -199,12 +203,12 @@ namespace LibreLancer
 			GL.Disable(GL.GL_SCISSOR_TEST);
 		}
 
-		public void DrawString(Font font, string str, Vector2 vec, Color4 color)
+		public void DrawString(Font font, float size, string str, Vector2 vec, Color4 color)
 		{
-			DrawString (font, str, vec.X, vec.Y, color);
+			DrawString (font, size, str, vec.X, vec.Y, color);
 		}
 
-		public void DrawStringBaseline(Font font, string text, float x, float y, float start_x, Color4 color, bool underline = false)
+		public void DrawStringBaseline(Font font, float size, string text, float x, float y, float start_x, Color4 color, bool underline = false)
 		{
 			if (!active)
 				throw new InvalidOperationException("Renderer2D.Start() must be called before Renderer2D.DrawString");
@@ -213,24 +217,25 @@ namespace LibreLancer
 			float dy = y;
 			int start = 0;
 			float dX = x;
+			var lh = font.LineHeight(size);
 			for (int i = 0; i < text.Length; i++)
 			{
 				if (text[i] == '\n')
 				{
-					DrawStringInternal(font, text, start, i, dX, dy, color, underline, true);
+					DrawStringInternal(font, size, text, start, i, dX, dy, color, underline, true);
 					dX = start_x;
-					dy += font.LineHeight;
+					dy += lh;
 					i++;
 					start = i;
 				}
 			}
 			if (start < text.Length)
 			{
-				DrawStringInternal(font, text, start, text.Length, dX, dy, color, underline, true);
+				DrawStringInternal(font, size, text, start, text.Length, dX, dy, color, underline, true);
 			}
 		}
 
-		public void DrawString(Font font, string text, float x, float y, Color4 color, bool underline = false)
+		public void DrawString(Font font, float size, string text, float x, float y, Color4 color, bool underline = false)
 		{
 			if (!active)
 				throw new InvalidOperationException ("Renderer2D.Start() must be called before Renderer2D.DrawString");
@@ -238,50 +243,49 @@ namespace LibreLancer
 				return;
 			float dy = y;
             int start = 0;
+			var lh = font.LineHeight(size);
             for(int i = 0; i < text.Length; i++)
             {
                 if(text[i] == '\n')
                 {
-                    DrawStringInternal(font, text, start, i, x, dy, color, underline, false);
-                    dy += font.LineHeight;
+                    DrawStringInternal(font, size, text, start, i, x, dy, color, underline, false);
+					dy += lh;
                     i++;
                     start = i;
                 }
             }
             if(start < text.Length)
             {
-                DrawStringInternal(font, text, start, text.Length, x, dy, color, underline, false);
+                DrawStringInternal(font, size, text, start, text.Length, x, dy, color, underline, false);
             }
 		}
 
-		static int GetAscender(Font font)
-		{
-			return font.Face.Size.Metrics.Ascender.ToInt32();
-		}
 
-		void DrawStringInternal(Font font, string str, int start, int end, float x, float y, Color4 color, bool underline, bool baseline)
+		void DrawStringInternal(Font font, float size, string str, int start, int end, float x, float y, Color4 color, bool underline, bool baseline)
 		{
 			int maxHeight = 0;
+			var glyphs = font.GetGlyphs(size);
 			if (!baseline)
 			{
 				var measureIter = new CodepointIterator(str, start, end);
 				while (measureIter.Iterate())
 				{
 					uint c = measureIter.Codepoint;
-					var glyph = font.GetGlyph(c);
+					var glyph = glyphs.GetGlyph(c);
 					maxHeight = Math.Max(maxHeight, glyph.Rectangle.Height);
 				}
 			}
-			var asc = GetAscender(font);
+			var asc = glyphs.Ascender;
 			var iter = new CodepointIterator (str, start, end);
 			float penX = x, penY = y;
+			bool set = false;
 			while (iter.Iterate ()) {
 				uint c = iter.Codepoint;
                 if(c == (uint)'\r') //Skip CR from CRLF
                 {
                     continue;
                 }
-				var glyph = font.GetGlyph (c);
+				var glyph = glyphs.GetGlyph (c);
 				if (glyph.Render) {
 					int py = baseline ? (int)penY + asc - glyph.YOffset : (int)penY + maxHeight - glyph.YOffset;
 					var dst = new Rectangle (
@@ -305,7 +309,8 @@ namespace LibreLancer
 					//penY += glyph.AdvanceY;
 				}
 				if (glyph.Kerning && iter.Index < iter.Count - 1) {
-					var g2 = font.GetGlyph (iter.PeekNext ());
+					var g2 = glyphs.GetGlyph (iter.PeekNext ());
+					if (!set) { set = true; font.Face.SetCharSize(0, glyphs.Size, 0, 96); }
 					var kerning = font.Face.GetKerning (glyph.CharIndex, g2.CharIndex, KerningMode.Default);
 					penX += (float)kerning.X;
 				}
@@ -321,6 +326,55 @@ namespace LibreLancer
 		public void FillRectangle(Rectangle rect, Color4 color)
 		{
 			DrawQuad(textShader, dot, new Rectangle(0,0,1,1), rect, color, BlendMode.Normal);
+		}
+		public void DrawLine(Color4 color, Vector2 start, Vector2 end)
+		{
+			if (currentShader != null && currentShader != textShader) Flush();
+			if (currentMode != BlendMode.Normal) Flush();
+			if (currentTexture != null && currentTexture != dot) Flush();
+			if ((primitiveCount + 2) * 3 >= MAX_INDEX || (vertexCount + 4) >= MAX_VERT) Flush();
+
+			currentShader = textShader;
+			currentTexture = dot;
+			currentMode = BlendMode.Normal;
+
+			var edge = end - start;
+			var angle = (float)Math.Atan2(edge.Y, edge.X);
+			var sin = (float)Math.Sin(angle);
+			var cos = (float)Math.Cos(angle);
+			var x = start.X;
+			var y = start.Y;
+			var w = edge.Length;
+
+			vertices[vertexCount++] = new Vertex2D(
+				new Vector2(x,y),
+				Vector2.Zero,
+				color
+			);
+			vertices[vertexCount++] = new Vertex2D(
+				new Vector2(x + w * cos, y + (w * sin)),
+				Vector2.Zero,
+				color
+			);
+			vertices[vertexCount++] = new Vertex2D(
+				new Vector2(x - sin, y + cos),
+				Vector2.Zero,
+				color
+			);
+			vertices[vertexCount++] = new Vertex2D(
+				new Vector2(x + w * cos - sin, y + w * sin + cos),
+				Vector2.Zero,
+				color
+			);
+
+			primitiveCount += 2;
+		}
+		public void DrawRectangle(Rectangle rect, Color4 color, int width)
+		{
+			FillRectangle(new Rectangle(rect.X, rect.Y, rect.Width, width), color);
+			FillRectangle(new Rectangle(rect.X, rect.Y, width, rect.Height), color);
+			FillRectangle(new Rectangle(rect.X, rect.Y + rect.Height - width, rect.Width, width), color);
+			FillRectangle(new Rectangle(rect.X + rect.Width - width, rect.Y, width, rect.Height), color);
 		}
 
 		public void FillRectangleMask(Texture2D mask, Rectangle src, Rectangle dst, Color4 color)
@@ -352,6 +406,49 @@ namespace LibreLancer
 			DrawQuad(imgShader, tex, source, dest, color, mode, flip);
 		}
 
+		public void FillTriangle(Vector2 point1, Vector2 point2, Vector2 point3, Color4 color)
+		{
+			if (currentShader != null && currentShader != textShader)
+			{
+				Flush();
+			}
+			if (currentMode != BlendMode.Normal)
+			{
+				Flush();
+			}
+			if (currentTexture != null && currentTexture != dot)
+			{
+				Flush();
+			}
+			if ((primitiveCount + 2) * 3 >= MAX_INDEX || (vertexCount + 4) >= MAX_VERT)
+				Flush();
+			currentTexture = dot;
+			currentShader = textShader;
+			currentMode = BlendMode.Normal;
+			vertices[vertexCount++] = new Vertex2D(
+				point1,
+				Vector2.Zero,
+				color
+			);
+			vertices[vertexCount++] = new Vertex2D(
+				point2,
+				Vector2.Zero,
+				color
+			);
+			vertices[vertexCount++] = new Vertex2D(
+				point3,
+				Vector2.Zero,
+				color
+			);
+			vertices[vertexCount++] = new Vertex2D(
+				point3,
+				Vector2.Zero,
+				color
+			);
+
+			primitiveCount += 2;
+
+		}
 		void DrawQuad(Shader shader, Texture2D tex, Rectangle source, Rectangle dest, Color4 color, BlendMode mode, bool flip = false)
 		{
 			if (currentShader != null && currentShader != shader)

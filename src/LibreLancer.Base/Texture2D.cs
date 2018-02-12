@@ -38,7 +38,7 @@ namespace LibreLancer
             LevelCount = hasMipMaps ? CalculateMipLevels(width, height) : 1;
 			//Bind the new TextureD
 			GLBind.Trash();
-			GLBind.BindTexture(0, GL.GL_TEXTURE_2D, ID);
+			GLBind.BindTexture(4, GL.GL_TEXTURE_2D, ID);
 			//initialise the texture data
 			var imageSize = 0;
 			Dxt1 = format == SurfaceFormat.Dxt1;
@@ -70,9 +70,12 @@ namespace LibreLancer
 			GL.TexParameteri(GL.GL_TEXTURE_2D, GL.GL_TEXTURE_MAG_FILTER, GL.GL_LINEAR);
         }
 
+        TextureFiltering currentFiltering = TextureFiltering.Linear;
 		public void SetFiltering(TextureFiltering filtering)
 		{
-			BindTo (4);
+            if (currentFiltering == filtering) return;
+            currentFiltering = filtering;
+            BindTo(4);
 			if (LevelCount > 1)
 			{
 				switch (filtering)
@@ -136,7 +139,7 @@ namespace LibreLancer
         }
         public void GetData<T>(T[] data) where T : struct
         {
-            GL.BindTexture(GL.GL_TEXTURE_2D, ID);
+			BindTo(4);
 			if (glFormat == GL.GL_NUM_COMPRESSED_TEXTURE_FORMATS)
             {
                 throw new NotImplementedException();
@@ -166,7 +169,7 @@ namespace LibreLancer
 		}
 		public unsafe void SetData<T>(int level, Rectangle? rect, T[] data, int start, int count) where T: struct
         {
-			GL.BindTexture(GL.GL_TEXTURE_2D, ID);
+			BindTo(4);
 			if (glFormat == GL.GL_NUM_COMPRESSED_TEXTURE_FORMATS)
             {
 				int w, h;
@@ -223,6 +226,7 @@ namespace LibreLancer
 
 		internal void SetData(int level, Rectangle rect, IntPtr data)
 		{
+			BindTo(4);
 			GL.TexSubImage2D (GL.GL_TEXTURE_2D, 0, rect.X, rect.Y, rect.Width, rect.Height, glFormat, glType, data);
 		}
 

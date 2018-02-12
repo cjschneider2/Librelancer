@@ -21,10 +21,10 @@ namespace LibreLancer.Fx
 	{
 		public FxPerpAppearance(AlchemyNode ale) : base(ale) { }
 
-		public override void Draw(ref Particle particle, float globaltime, ParticleEffect effect, ResourceManager res, Billboards billboards, ref Matrix4 transform, float sparam)
+		public override void Draw(ref Particle particle, float globaltime, NodeReference reference, ResourceManager res, Billboards billboards, ref Matrix4 transform, float sparam)
 		{
 			var time = particle.TimeAlive / particle.LifeSpan;
-			var node_tr = GetTranslation(effect, transform, sparam, time);
+			var node_tr = GetTranslation(reference, transform, sparam, time);
 
 			var p = node_tr.Transform(particle.Position);
 			Texture2D tex;
@@ -46,10 +46,15 @@ namespace LibreLancer.Fx
 				bl,
 				br,
 				n,
-				Rotate == null ? 0f : Rotate.GetValue(sparam, time),
+                Rotate == null ? 0f : MathHelper.DegreesToRadians(Rotate.GetValue(sparam, time)),
 				SortLayers.OBJECT,
 				BlendInfo
 			);
+
+			if (DrawNormals)
+			{
+				Debug.DrawLine(p - (n * 8), p + (n * 8));
+			}
 		}
 	}
 }

@@ -37,11 +37,13 @@ namespace LibreLancer
 		public void Update()
 		{
 			var fovy = Transform.FovH * Transform.AspectRatio;
-			projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(fovy), Transform.AspectRatio, 10f, 100000000f);
-			Vector3 originalTarget = VectorMath.Forward;
+			//TODO: Tweak clip plane some more - isn't quite right
+			//NOTE: near clip plane can't be too small or it causes z-fighting
+			projection = Matrix4.CreatePerspectiveFieldOfView(MathHelper.DegreesToRadians(fovy), Transform.AspectRatio, 2.5f, 10000000f);
+			Vector3 originalTarget = Vector3.Forward;
 			Vector3 rotatedTarget = Transform.Orientation.Transform(originalTarget);
 			Vector3 target = Transform.LookAt == null ? Position + rotatedTarget : Transform.LookAt.Transform.ExtractTranslation();
-			Vector3 upVector = Transform.Orientation.Transform(VectorMath.Up);
+			Vector3 upVector = Transform.Orientation.Transform(Vector3.Up);
 			view = Matrix4.LookAt(Position, target, upVector);
 			frameNo++;
 			viewProjection = view * projection;

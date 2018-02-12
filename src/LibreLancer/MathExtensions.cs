@@ -14,7 +14,6 @@
  * the Initial Developer. All Rights Reserved.
  */
 using System;
-using Jitter.LinearMath;
 
 namespace LibreLancer
 {
@@ -47,10 +46,7 @@ namespace LibreLancer
 		{
 			return new Vector3 (-mat.M31, -mat.M32, -mat.M33);
 		}
-		public static JVector GetForward(this JMatrix mat)
-		{
-			return new JVector (-mat.M31, -mat.M32, -mat.M33);
-		}
+
 		public static Vector3 GetUp(this Matrix4 mat)
 		{
 			return new Vector3 (mat.M12, mat.M22, mat.M32);
@@ -59,28 +55,34 @@ namespace LibreLancer
 		{
 			return new Vector3 (mat.M11, mat.M21, mat.M31);
 		}
-		public static Vector3 ToOpenTK(this JVector src)
+		/// <summary>
+		/// Gets the Pitch Yaw and Roll from a Matrix3 SLOW!!!
+		/// </summary>
+		/// <returns>(x - pitch, y - yaw, z - roll)</returns>
+		/// <param name="mx">The matrix.</param>
+		public static Vector3 GetEuler(this Matrix4 mx)
 		{
-			return new Vector3 (src.X, src.Y, src.Z);
+			double p, y, r;
+			DecomposeOrientation(mx, out p, out y, out r);
+			return new Vector3((float)p, (float)y, (float)r);
 		}
-		public static JVector ToJitter(this Vector3 src)
+
+		static void DecomposeOrientation(Matrix4 mx, out double xPitch, out double yYaw, out double zRoll)
 		{
-			return new JVector (src.X, src.Y, src.Z);
-		}
-		public static JMatrix GetOrientation(this Matrix4 src)
-		{
-			var qt = src.ExtractRotation(true);
-			var jqt = new JQuaternion(qt.X, qt.Y, qt.Z, qt.W);
-			return JMatrix.CreateFromQuaternion(jqt);
-		}
-		public static Matrix4 ToOpenTK(this JMatrix src)
-		{
-			return new Matrix4 (
-				         src.M11, src.M12, src.M13, 0,
-				         src.M21, src.M22, src.M23, 0,
-				         src.M31, src.M32, src.M33, 0,
-				         0, 0, 0, 1
-			         );
+			xPitch = Math.Asin(-mx.M32);
+			double threshold = 0.001; // Hardcoded constant – burn him, he’s a witch
+			double test = Math.Cos(xPitch);
+
+			if (test > threshold)
+			{
+				zRoll = Math.Atan2(mx.M12, mx.M22);
+				yYaw = Math.Atan2(mx.M31, mx.M33);
+			}
+			else
+			{
+				zRoll = Math.Atan2(-mx.M21, mx.M11);
+				yYaw = 0.0;
+			}
 		}
 	}
 }

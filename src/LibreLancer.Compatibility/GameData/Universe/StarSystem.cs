@@ -343,7 +343,7 @@ namespace LibreLancer.Compatibility.GameData.Universe
 			return (from SystemObject o in Objects where o.Nickname.ToLowerInvariant() == nickname.ToLowerInvariant() select o).First<SystemObject>();
 		}
 
-		public SystemObject FindJumpGateTo(StarSystem system)
+		/*public SystemObject FindJumpGateTo(StarSystem system)
 		{
 			return (from SystemObject o in Objects where o.Archetype is JumpGate && o.Goto.System == system select o).First<SystemObject>();
 		}
@@ -351,11 +351,13 @@ namespace LibreLancer.Compatibility.GameData.Universe
 		public SystemObject FindJumpHoleTo(StarSystem system)
 		{
 			return (from SystemObject o in Objects where o.Archetype is JumpHole && o.Goto.System == system select o).First<SystemObject>();
-		}
+		}*/
 
 		public Zone FindZone(string nickname)
 		{
-			return (from Zone z in Zones where z.Nickname.ToLowerInvariant() == nickname.ToLowerInvariant() select z).First<Zone>();
+			var res = (from Zone z in Zones where z.Nickname.ToLowerInvariant() == nickname.ToLowerInvariant() select z);
+			if (res.Count() == 0) return null;
+			return res.First();
 		}
 	}
 }

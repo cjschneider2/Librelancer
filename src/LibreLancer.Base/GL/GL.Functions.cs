@@ -64,6 +64,8 @@ namespace LibreLancer
         }
         [MapsTo("glPolygonMode")]
 		public static PolygonMode PolygonMode;
+		[MapsTo("glLineWidth")]
+		public static LineWidth LineWidth;
 		[MapsTo("glDepthFunc")]
 		public static DepthFunc DepthFunc;
 		[MapsTo("glCullFace")]
@@ -72,6 +74,8 @@ namespace LibreLancer
 		public static PixelStorei PixelStorei;
 		[MapsTo("glDepthMask")]
 		public static DepthMask DepthMask;
+		[MapsTo("glPolygonOffset")]
+		public static PolygonOffset PolygonOffset;
 		//[MapsTo("glAlphaFunc")]
 		//public static AlphaFunc AlphaFunc;
 		//Textures
@@ -93,6 +97,8 @@ namespace LibreLancer
 		public static ActiveTexture ActiveTexture;
 		[MapsTo("glTexParameteri")]
 		public static TexParameteri TexParameteri;
+		[MapsTo("glTexParameterfv")]
+		public static TexParameterfv TexParameterfv;
 		[MapsTo("glBindTexture")]
 		public static BindTexture BindTexture;
 		[MapsTo("glTexImage2D")]
@@ -106,6 +112,8 @@ namespace LibreLancer
 		[MapsTo("glGetTexImage")]
 		public static GetTexImage GetTexImage;
 		//Shaders
+		[MapsTo("glDispatchCompute")]
+		public static DispatchCompute DispatchCompute;
 		[MapsTo("glCreateShader")]
 		public static CreateShader CreateShader;
 		[MapsTo("glCompileShader")]
@@ -150,6 +158,8 @@ namespace LibreLancer
 		public static Uniform1i Uniform1i;
 		[MapsTo("glUniform1f")]
 		public static Uniform1f Uniform1f;
+		[MapsTo("glUniform2i")]
+		public static Uniform2i Uniform2i;
 		[MapsTo("glUniform2f")]
 		public static Uniform2f Uniform2f;
 		[MapsTo("glUniform3f")]
@@ -221,6 +231,14 @@ namespace LibreLancer
 		}
 		[MapsTo("glDrawBuffer")]
 		public static DrawBuffer DrawBuffer;
+		[MapsTo("glMapBuffer")]
+		public static MapBuffer MapBuffer;
+		[MapsTo("glUnmapBuffer")]
+		public static UnmapBuffer UnmapBuffer;
+		[MapsTo("glBindBufferBase")]
+		public static BindBufferBase BindBufferBase;
+		[MapsTo("glMemoryBarrier")]
+		public static MemoryBarrier MemoryBarrier;
 		//Drawing
 		[MapsTo("glDrawElements")]
 		public static DrawElements DrawElements;
@@ -287,6 +305,14 @@ namespace LibreLancer
             GLES = false;
             Load((f, t) => Marshal.GetDelegateForFunctionPointer(SDL.SDL_GL_GetProcAddress(f), (t)));
 		}
+        public static bool CheckStringSDL()
+        {
+            _getString = (GetString)Marshal.GetDelegateForFunctionPointer(SDL.SDL_GL_GetProcAddress("glGetString"), typeof(GetString));
+            var str = GetString(GL.GL_VERSION);
+            FLLog.Info("GL", "Version String: " + GetString(GL.GL_VERSION));
+            var major = int.Parse(str[0].ToString());
+            return major >= 3;
+        }
         public static void Load(Func<string,Type,Delegate> getprocaddress)
         {
             errors = new Dictionary<int, string>();
@@ -313,7 +339,7 @@ namespace LibreLancer
                     continue;
                 //var del = Marshal.GetDelegateForFunctionPointer(getprocaddress(proc), f.FieldType);
                 var del = getprocaddress(proc, f.FieldType);
-                if (proc != "glGetError")
+                if (proc != "glGetError" && del != null)
                     del = MakeWrapper(f.FieldType, del);
                 f.SetValue(null, del);
                 loaded++;

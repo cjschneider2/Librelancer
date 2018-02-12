@@ -16,19 +16,17 @@
 using System;
 using System.Collections.Generic;
 using LibreLancer.GameData;
-using LibreLancer.GameData.Archetypes;
 using LibreLancer.Utf.Cmp;
-using LibreLancer.Utf.Mat;
-using LibreLancer.Vertices;
 namespace LibreLancer
 {
-	public class SystemRenderer
+	//Responsible for rendering the GameWorld.
+	public class SystemRenderer : IDisposable
 	{
 		ICamera camera;
 
-		public Matrix4 World { get; private set; }
+		public Color4 NullColor = Color4.Black;
 
-		public List<ObjectRenderer> Objects { get; private set; }
+        public GameWorld World { get; set; }
 		public List<AsteroidFieldRenderer> AsteroidFields { get; private set; }
 		public List<NebulaRenderer> Nebulae { get; private set; }
 
@@ -40,11 +38,11 @@ namespace LibreLancer
 		}
 		
 		//Global Renderer Options
-		public float LODMultiplier = 32;
-		
+		public float LODMultiplier = 2;
+		public bool ExtraLights = false; //See comments in Draw() before enabling
+
 		public IDrawable[] StarSphereModels;
 		public Matrix4[] StarSphereWorlds;
-
 		public PhysicsDebugRenderer DebugRenderer;
 		public PolylineRender Polyline;
 		public SystemLighting SystemLighting = new SystemLighting();
@@ -52,6 +50,14 @@ namespace LibreLancer
 		RenderState rstate;
 		FreelancerGame game;
 		Texture2D dot;
+
+		//Fancy Forward+ stuff (GL 4.3 up)
+		List<PointLight> pointLights = new List<PointLight>();
+		static ComputeShader pointLightCull;
+		ShaderStorageBuffer pointLightBuffer;
+		ShaderStorageBuffer transparentLightBuffer;
+		//ShaderStorageBuffer opaqueLightBuffer;
+		const int MAX_POINTS = 1024;
 
 		public FreelancerGame Game
 		{
@@ -61,21 +67,25 @@ namespace LibreLancer
 			}
 		}
 
-		public SystemRenderer(ICamera camera, LegacyGameData data, ResourceManager rescache)
+		public SystemRenderer(ICamera camera, LegacyGameData data, ResourceManager rescache, FreelancerGame game)
 		{
 			this.camera = camera;			
-			World = Matrix4.Identity;
-			Objects = new List<ObjectRenderer>();
 			AsteroidFields = new List<AsteroidFieldRenderer>();
 			Nebulae = new List<NebulaRenderer>();
 			StarSphereModels = new IDrawable[0];
 			Polyline = new PolylineRender(commands);
 			cache = rescache;
 			rstate = cache.Game.RenderState;
-			game = rescache.Game;
-			dot = new Texture2D(1, 1, false, SurfaceFormat.Color);
-			dot.SetData(new uint[] { 0xFFFFFFFF });
+			this.game = game;
+			dot = (Texture2D)rescache.FindTexture(ResourceManager.WhiteTextureName);
 			DebugRenderer = new PhysicsDebugRenderer();
+
+			if (GLExtensions.Features430)
+			{
+				pointLightBuffer = new ShaderStorageBuffer(MAX_POINTS * (16 * sizeof(float)));
+				if(pointLightCull != null)
+					pointLightCull = new ComputeShader(Resources.LoadString("LibreLancer.Shaders.lightingcull.glcompute"));
+			}
 		}
 
 		void LoadSystem(StarSystem system)
@@ -89,7 +99,7 @@ namespace LibreLancer
 
 			if (AsteroidFields != null)
 				foreach (var f in AsteroidFields) f.Dispose();
-			
+
 			cache.ClearTextures();
 
 			//Load new system
@@ -121,15 +131,16 @@ namespace LibreLancer
 			{
 				foreach (var n in system.Nebulae)
 				{
-					Nebulae.Add(new NebulaRenderer(n, camera, cache.Game));
+					Nebulae.Add(new NebulaRenderer(n, camera, Game));
 				}
 			}
-		
+
 			SystemLighting = new SystemLighting();
 			SystemLighting.Ambient = system.AmbientColor;
-            foreach (var lt in system.LightSources)
+			foreach (var lt in system.LightSources)
 				SystemLighting.Lights.Add(new DynamicLight() { Light = lt });
 		}
+
 		public void Update(TimeSpan elapsed)
 		{
 			foreach (var model in StarSphereModels)
@@ -160,10 +171,41 @@ namespace LibreLancer
 			}
 			return null;
 		}
+
+		//ExtraLights: Render a point light with DX attenuation
+		//TODO: Allow for cubic / IGraph attenuation
+		public void PointLightDX(Vector3 position, float range, Color4 color, Vector3 attenuation)
+		{
+			if (!GLExtensions.Features430 || !ExtraLights) 
+				return;
+			var lt = new PointLight();
+			lt.Position = new Vector4(position, 1);
+			lt.ColorRange = new Vector4(color.R, color.G, color.B, range);
+			lt.Attenuation = new Vector4(attenuation, 0);
+			lock(pointLights) {
+				if (pointLights.Count >= 1023)
+					return;
+				pointLights.Add(lt); //TODO: Alternative to Locking this? Try ConcurrentBag<T> again maybe.
+			}
+		}
+
 		MultisampleTarget msaa;
 		int _mwidth = -1, _mheight = -1;
 		CommandBuffer commands = new CommandBuffer();
-		public void Draw()
+		int _twidth = -1, _theight = -1;
+		int _dwidth = -1, _dheight = -1;
+		DepthMap depthMap;
+
+        List<ObjectRenderer> objects;
+
+        public void AddObject(ObjectRenderer render)
+        {
+            lock (objects)
+            {
+                objects.Add(render);
+            }
+        }
+		public unsafe void Draw()
 		{
 			if (game.Config.MSAASamples > 0)
 			{
@@ -178,10 +220,30 @@ namespace LibreLancer
 				msaa.Bind();
 			}
 			NebulaRenderer nr = CheckNebulae(); //are we in a nebula?
+
 			bool transitioned = false;
 			if (nr != null)
 				transitioned = nr.FogTransitioned();
 			rstate.DepthEnabled = true;
+			//Add Nebula light
+			if (GLExtensions.Features430 && ExtraLights)
+			{
+				//TODO: Re-add [LightSource] to the compute shader, it shouldn't regress.
+				PointLight p2;
+				if (nr != null && nr.DoLightning(out p2))
+					pointLights.Add(p2);
+			}
+            //Async calcs
+            objects = new List<ObjectRenderer>(250);
+            for (int i = 0; i < World.Objects.Count; i += 16)
+			{
+				JThreads.Instance.AddTask((o) =>
+				{
+					var offset = (int)o;
+					for (int j = 0; j < 16 && ((j + offset) < World.Objects.Count); j++) World.Objects[j + offset].PrepareRender(camera, nr, this);
+				}, i);
+			}
+			JThreads.Instance.BeginExecute();
 			if (transitioned)
 			{
 				//Fully in fog. Skip Starsphere
@@ -192,7 +254,7 @@ namespace LibreLancer
 			{
 				rstate.DepthEnabled = false;
 				if (starSystem == null)
-					rstate.ClearColor = Color4.Black;
+					rstate.ClearColor = NullColor;
 				else
 					rstate.ClearColor = starSystem.BackgroundColor;
 				rstate.ClearAll();
@@ -213,13 +275,90 @@ namespace LibreLancer
 			}
 			DebugRenderer.StartFrame(camera, rstate);
 			Polyline.SetCamera(camera);
-			commands.StartFrame();
+			commands.StartFrame(rstate);
 			rstate.DepthEnabled = true;
 			//Optimisation for dictionary lookups
 			LightEquipRenderer.FrameStart();
 			//Clear depth buffer for game objects
+			rstate.ClearDepth();
 			game.Billboards.Begin(camera, commands);
-			for (int i = 0; i < Objects.Count; i++) Objects[i].Draw(camera, commands, SystemLighting, nr);
+			JThreads.Instance.FinishExecute(); //Make sure visibility calculations are complete						  
+			if (GLExtensions.Features430 && ExtraLights)
+			{
+				//Forward+ heck yeah!
+				//ISSUES: Z prepass here doesn't work - gives blank texture  (investigate DepthMap.cs)
+				//(WORKED AROUND) Lights being culled too aggressively - Pittsburgh planet light, intro_planet_chunks
+				//Z test - cull transparent and opaque differently (opaqueLightBuffer enable)
+				//Optimisation work needs to be done
+				//When these are fixed this can be enabled by default
+				//Copy lights into buffer
+				int plc = pointLights.Count;
+				using (var h = pointLightBuffer.Map()) {
+					var ptr = (PointLight*)h.Handle;
+					for (int i = 0; i < pointLights.Count; i++)
+					{
+						ptr[i] = pointLights[i];
+					}
+					//Does the rest of the buffer need to be cleared?
+				}
+				pointLights.Clear();
+				//Setup Visible Buffers
+				var tilesW = (Game.Width + (Game.Width % 16)) / 16;
+				var tilesH = (Game.Height + (Game.Height % 16)) / 16;
+				SystemLighting.NumberOfTilesX = tilesW;
+				if (_twidth != tilesW || _theight != tilesH)
+				{
+					_twidth = tilesW;
+					_theight = tilesH;
+					//if (opaqueLightBuffer != null) opaqueLightBuffer.Dispose();
+					if (transparentLightBuffer != null) transparentLightBuffer.Dispose();
+					//opaqueLightBuffer = new ShaderStorageBuffer((tilesW * tilesH) * 512 * sizeof(int)); 
+					transparentLightBuffer = new ShaderStorageBuffer((tilesW * tilesH) * 512 * sizeof(int)); 
+				}
+				//Depth
+				if (_dwidth != Game.Width || _dheight != Game.Height)
+				{
+					_dwidth = Game.Width;
+					_dheight = Game.Height;
+					if (depthMap != null) depthMap.Dispose();
+					depthMap = new DepthMap(Game.Width, game.Height);
+				}
+				depthMap.BindFramebuffer();
+				rstate.ClearDepth();
+				rstate.DepthFunction = DepthFunction.Less;
+                foreach (var obj in objects) obj.DepthPrepass(camera, rstate);
+				//for (int i = 0; i < Objects.Count; i++) if (Objects[i].Visible) Objects[i].DepthPrepass(camera, rstate);
+				rstate.DepthFunction = DepthFunction.LessEqual;
+				RenderTarget2D.ClearBinding();
+				if (game.Config.MSAASamples > 0) msaa.Bind();
+				//Run compute shader
+				pointLightBuffer.BindIndex(0);
+				transparentLightBuffer.BindIndex(1);
+				//opaqueLightBuffer.BindIndex(2);
+				pointLightCull.Uniform1i("depthTexture", 7);
+				depthMap.BindTo(7);
+				pointLightCull.Uniform1i("numLights", plc);
+				pointLightCull.Uniform1i("windowWidth", Game.Width);
+				pointLightCull.Uniform1i("windowHeight", Game.Height);
+				var v = camera.View;
+				var p = camera.Projection;
+				p.Invert();
+				pointLightCull.UniformMatrix4fv("viewMatrix", ref v);
+				pointLightCull.UniformMatrix4fv("invProjection", ref p);
+				GL.MemoryBarrier(GL.GL_SHADER_STORAGE_BARRIER_BIT); //I don't think these need to be here - confirm then remove?
+				pointLightCull.Dispatch((uint)tilesW, (uint)tilesH, 1);
+				GL.MemoryBarrier(GL.GL_SHADER_STORAGE_BARRIER_BIT);
+			}
+			else
+			{
+				SystemLighting.NumberOfTilesX = -1;
+				//Simple depth pre-pass
+				rstate.DepthFunction = DepthFunction.Less;
+                foreach (var obj in objects) obj.DepthPrepass(camera, rstate);
+				rstate.DepthFunction = DepthFunction.LessEqual;
+			}
+			//Actual Drawing
+			foreach (var obj in objects) obj.Draw(camera, commands, SystemLighting, nr);
 			for (int i = 0; i < AsteroidFields.Count; i++) AsteroidFields[i].Draw(cache, SystemLighting, commands, nr);
 			game.Nebulae.NewFrame();
 			if (nr == null)
@@ -243,8 +382,18 @@ namespace LibreLancer
 			{
 				msaa.BlitToScreen();
 			}
+			rstate.DepthEnabled = true;
 		}
 
+		public void Dispose()
+		{
+			if (pointLightBuffer != null) pointLightBuffer.Dispose();
+			if (transparentLightBuffer != null) transparentLightBuffer.Dispose();
+			if (msaa != null) msaa.Dispose();
+			if (depthMap != null) depthMap.Dispose();
+			Polyline.Dispose();
+			DebugRenderer.Dispose();
+		}
 	}
 }
 

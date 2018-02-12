@@ -26,6 +26,7 @@ namespace LibreLancer.Compatibility.GameData
 		public string BodypartsPath { get; private set; }
 		public string CostumesPath { get; private set; }
 		public string EffectShapesPath { get; private set; }
+		public Tuple<string, string> JsonResources { get; private set; }
 		public FreelancerIni ()
 		{
 			EquipmentPaths = new List<string> ();
@@ -37,6 +38,8 @@ namespace LibreLancer.Compatibility.GameData
 			AsteroidPaths = new List<string> ();
 			RichFontPaths = new List<string>();
 			PetalDbPaths = new List<string>();
+			StartupMovies = new List<string>();
+
 			foreach (Section s in ParseFile("EXE\\freelancer.ini")) {
 				switch (s.Name.ToLowerInvariant ()) {
 				case "freelancer":
@@ -50,6 +53,9 @@ namespace LibreLancer.Compatibility.GameData
 						}
 					}
 					break;
+				case "jsonresources":
+					JsonResources = new Tuple<string, string>(s[0][0].ToString(), s[0][1].ToString());
+					break;
 				case "resources":
 					Resources = new List<DllFile> ();
 					//NOTE: Freelancer hardcodes resources.dll
@@ -62,7 +68,6 @@ namespace LibreLancer.Compatibility.GameData
 					}
 					break;
 				case "startup":
-					StartupMovies = new List<string> ();
 					foreach (Entry e in s) {
 						if (e.Name.ToLowerInvariant () != "movie_file")
 							continue;

@@ -27,21 +27,33 @@ namespace LibreLancer.Utf.Mat
 		protected ILibFile textureLibrary;
 		protected Shader effect = null;
 
-		public bool IsDisposed { get { return false; } }
+		public bool Loaded = true;
 
-		public string type { get; private set; }
+		string type;
+		public string Type
+		{
+			get
+			{
+				return type;
+			}
+			set
+			{
+				type = value;
+				isBasic = basicMaterials.Contains(type);
+			}
+		}
 
 		/// <summary>
 		/// Material Name
 		/// </summary>
-		public string Name { get; private set; }
+		public string Name { get; set; }
 
 		/// <summary>
 		/// Diffuse Texture Flags
 		/// </summary>
-		public int DtFlags { get; private set; }
+		public int DtFlags { get; set; }
 
-		public string DtName { get; private set; }
+		public string DtName { get; set; }
 
 
 		/// <summary>
@@ -66,6 +78,9 @@ namespace LibreLancer.Utf.Mat
 		private string btName;
 
 
+		public int NtFlags { get; private set; }
+		public string NtName;
+
 		/// <summary>
 		/// Opacity
 		/// </summary>
@@ -76,7 +91,7 @@ namespace LibreLancer.Utf.Mat
 		/// </summary>
 		public int EtFlags { get; private set; }
 
-		private string etName;
+		public string EtName;
 
 		public Color4 Ac { get; set; }
 
@@ -118,7 +133,7 @@ namespace LibreLancer.Utf.Mat
 		/// </summary>
 		public int Dm1Flags { get; private set; }
 
-		private string dm1Name;
+		public string Dm1Name;
 
 		/// <summary>
 		/// Tile Rate 0 tile amount (1=no tiling, >1 creates multiple tiles), 0 (f)
@@ -140,20 +155,21 @@ namespace LibreLancer.Utf.Mat
 		/// </summary>
 		public int DmFlags { get; private set; }
 
-		private string dmName;
+		public string DmName;
 
 		static List<string> basicMaterials = new List<string> {
 			"Dc", //DcDt buggy
 			"DcDt", "DcDtTwo", "DcDtEc", "DcDtEt", "DcDtEcEt",
 			"DcDtOcOt", "DcDtBtOcOt", "DcDtBtOcOtTwo", "DcDtEcOcOt",
 			"DcDtOcOtTwo", "DcDtBt", "DcDtBtTwo", "BtDetailMapMaterial",
-			"DcDtEcOcOtTwo"
+			"DcDtEcOcOtTwo", "DcDtEtTwo", "DcDtEcTwo"
 		};
 		RenderMaterial _rmat;
 		public RenderMaterial Render
 		{
 			get
 			{
+				if (!Loaded) throw new Exception("Material unloaded"); //Should never happen
 				if (_rmat == null)
 					Initialize();
 				return _rmat;
@@ -176,15 +192,16 @@ namespace LibreLancer.Utf.Mat
 			}
 		}
 
-		public Material()
+		public Material(ResourceManager res)
 		{
-			textureLibrary = new TxmFile();
+			textureLibrary = res;
 			type = "DcDt";
 
 			Name = "NullMaterial";
-
-			DtFlags = -1;
+			DtFlags = 0;
+			Dc = Color4.Magenta;
 			DtName = null;
+			isBasic = true;
 		}
 
 		public static Material FromNode(IntermediateNode node, ILibFile textureLibrary)
@@ -205,7 +222,8 @@ namespace LibreLancer.Utf.Mat
 
 			if (type == "HighGlassMaterial" || 
 			    type == "HUDAnimMaterial" || 
-			    type == "HUDIconMaterial")
+			    type == "HUDIconMaterial" ||
+			    type == "PlanetWaterMaterial")
 			{
 				type = "DcDtOcOt"; //HACK: Should do env mapping
 			}
@@ -229,6 +247,7 @@ namespace LibreLancer.Utf.Mat
 					case "IllumDetailMapMaterial":
 					case "Masked2DetailMapMaterial":
 					case "NomadMaterialNoBendy":
+					case "NomadMaterial":
 						break;
 					default:
 						throw new Exception("Invalid material type: " + type);
@@ -270,7 +289,7 @@ namespace LibreLancer.Utf.Mat
 					EtFlags = n.Int32ArrayData [0];
 					break;
 				case "et_name":
-					etName = n.StringData;
+					EtName = n.StringData;
 					break;
 				case "oc":
 					Oc = n.SingleArrayData [0];
@@ -309,7 +328,7 @@ namespace LibreLancer.Utf.Mat
 					Dm1Flags = n.Int32Data.Value;
 					break;
 				case "dm1_name":
-					dm1Name = n.StringData;
+					Dm1Name = n.StringData;
 					break;
 				case "tilerate0":
 					TileRate0 = n.SingleData.Value;
@@ -324,7 +343,13 @@ namespace LibreLancer.Utf.Mat
 					DmFlags = n.Int32Data.Value;
 					break;
 				case "dm_name":
-					dmName = n.StringData;
+					DmName = n.StringData;
+					break;
+				case "nt_name":
+					NtName = n.StringData;
+					break;
+				case "nt_flags":
+					NtFlags = n.Int32Data.Value;
 					break;
 				default:
 					throw new NotImplementedException();
@@ -347,7 +372,7 @@ namespace LibreLancer.Utf.Mat
 				bm.Ec = Ec;
 				bm.DtSampler = DtName;
 				bm.DtFlags = (SamplerFlags)DtFlags;
-				bm.EtSampler = etName;
+				bm.EtSampler = EtName;
 				bm.EtFlags = (SamplerFlags)EtFlags;
 				bm.Library = textureLibrary;
 				if (type.Contains("Ot"))
@@ -395,7 +420,7 @@ namespace LibreLancer.Utf.Mat
 						m2.DtFlags = (SamplerFlags)DtFlags;
 						m2.Dm0Sampler = dm0Name;
 						m2.Dm0Flags = (SamplerFlags)Dm0Flags;
-						m2.Dm1Sampler = dm1Name;
+						m2.Dm1Sampler = Dm1Name;
 						m2.Dm1Flags = (SamplerFlags)Dm1Flags;
 						m2.Library = textureLibrary;
 						break;
@@ -414,7 +439,7 @@ namespace LibreLancer.Utf.Mat
 
 						ilm.Dm0Sampler = dm0Name;
 						ilm.Dm0Flags = (SamplerFlags)Dm0Flags;
-						ilm.Dm1Sampler = dm1Name;
+						ilm.Dm1Sampler = Dm1Name;
 						ilm.Dm1Flags = (SamplerFlags)Dm1Flags;
 						ilm.Library = textureLibrary;
 						break;
@@ -430,7 +455,7 @@ namespace LibreLancer.Utf.Mat
 						dm2p.DtSampler = DtName;
 						dm2p.DtFlags = (SamplerFlags)DtFlags;
 
-						dm2p.Dm1Sampler = dm1Name;
+						dm2p.Dm1Sampler = Dm1Name;
 						dm2p.Dm1Flags = (SamplerFlags)Dm1Flags;
 						dm2p.Library = textureLibrary;
 						break;
@@ -443,6 +468,8 @@ namespace LibreLancer.Utf.Mat
 						nmd.BtFlags = (SamplerFlags)BtFlags;
 						nmd.DtSampler = DtName;
 						nmd.DtFlags = (SamplerFlags)DtFlags;
+						nmd.NtFlags = (SamplerFlags)NtFlags;
+						nmd.NtSampler = NtName;
 						nmd.Oc = Oc ?? 1f;
 						nmd.Library = textureLibrary;
 						break;
@@ -454,11 +481,14 @@ namespace LibreLancer.Utf.Mat
 						dm.FlipU = FlipU;
 						dm.FlipV = FlipV;
 						dm.TileRate = TileRate;;
-						dm.DmSampler = dmName;
+						dm.DmSampler = DmName;
 						dm.DmFlags = (SamplerFlags)DmFlags;
 						dm.DtSampler = DtName;
 						dm.DtFlags = (SamplerFlags)DtFlags;
 						dm.Library = textureLibrary;
+						break;
+					case "NormalDebugMaterial":
+						_rmat = new NormalDebugMaterial();
 						break;
 					default:
 						throw new NotImplementedException();

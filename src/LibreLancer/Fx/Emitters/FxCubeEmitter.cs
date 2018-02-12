@@ -45,7 +45,7 @@ namespace LibreLancer.Fx
 			}	
 		}
 
-		protected override void SetParticle (int idx, ParticleEffect fx, ParticleEffectInstance instance, ref Matrix4 transform, float sparam)
+		protected override void SetParticle (int idx, NodeReference reference, ParticleEffectInstance instance, ref Matrix4 transform, float sparam)
 		{
 			float w = Width.GetValue (sparam, 0) / 2;
 			float h = Height.GetValue (sparam, 0) / 2;
@@ -73,16 +73,16 @@ namespace LibreLancer.Fx
 		}
 
 
-		static Vector3 RandomInCone(Random r, float minradius, float maxradius)
+        static Vector3 RandomInCone(Random r, float minspread, float maxspread)
 		{
 			//(sqrt(1 - z^2) * cosϕ, sqrt(1 - z^2) * sinϕ, z)
-			var radradius = maxradius / 2;
+            var halfspread = maxspread / 2;
 
-			float z = r.NextFloat((float)Math.Cos(radradius), 1 - (minradius / 2));
+			float z = r.NextFloat((float)Math.Cos(halfspread), 1 - (minspread / 2));
 			float t = r.NextFloat(0, (float)(Math.PI * 2));
 			return new Vector3(
-				(float)(Math.Sqrt(1 - z * z) * Math.Cos(t)),  
-				z,
+				(float)(Math.Sqrt(1 - z * z) * Math.Cos(t)), 
+                z,
 				(float)(Math.Sqrt(1 - z * z) * Math.Sin(t))
 			);
 		}

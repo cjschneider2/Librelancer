@@ -18,12 +18,14 @@ using System.IO;
 
 namespace LibreLancer.Media
 {
-	public class SoundData
+	public class SoundData : IDisposable
 	{
 		internal uint ID;
-		internal SoundData(uint id)
+		AudioManager man;
+		internal SoundData(uint id, AudioManager manager)
 		{
-			this.ID = id;
+			ID = id;
+			man = manager;
 		}
 
 		public void LoadFile(string filename)
@@ -56,6 +58,9 @@ namespace LibreLancer.Media
 			}
 		}
 
+		public void Dispose()
+		{
+			man.ReturnBuffer(ID);
+		}
 	}
 }
-

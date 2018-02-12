@@ -27,13 +27,19 @@ namespace LibreLancer.Compatibility.GameData.Universe
 		public string Nickname { get; private set; }
 		public string Music { get; private set; }
 		public List<string> SceneScripts { get; private set; }
+		public List<RoomHotspot> Hotspots { get; private set; }
 		public string Camera { get; private set; }
+		public string PlayerShipPlacement { get; private set; }
+		public string LaunchingScript { get; private set; }
+		public string LandingScript { get; private set; }
+
 		public Room(Section section, FreelancerData data)
 		{
 			GameData = data;
 			if (section == null) throw new ArgumentNullException("section");
 			string file = null;
 			SceneScripts = new List<string>();
+			Hotspots = new List<RoomHotspot>();
 			foreach (Entry e in section)
 			{
 				switch (e.Name.ToLowerInvariant())
@@ -89,7 +95,21 @@ namespace LibreLancer.Compatibility.GameData.Universe
 					// TODO Room spiels
 					break;
 				case "playershipplacement":
-					// TODO Room playershipplacement
+						foreach (Entry e in s)
+						{
+							switch (e.Name.ToLowerInvariant())
+							{
+								case "name":
+									PlayerShipPlacement = e[0].ToString();
+									break;
+								case "launching_script":
+									LaunchingScript = e[0].ToString();
+									break;
+								case "landing_script":
+									LandingScript = e[0].ToString();
+									break;
+							}
+						}
 					break;
 				case "characterplacement":
 					// TODO Room characterplacement
@@ -98,7 +118,27 @@ namespace LibreLancer.Compatibility.GameData.Universe
 					// TODO Room forsaleshipplacement
 					break;
 				case "hotspot":
-					// TODO Room hotspot
+						// TODO Room hotspot
+						var hotspot = new RoomHotspot();
+						foreach (Entry e in s)
+						{
+							switch (e.Name.ToLowerInvariant())
+							{
+								case "name":
+									hotspot.Name = e[0].ToString();
+									break;
+								case "behavior":
+									hotspot.Behavior = e[0].ToString();
+									break;
+								case "room_switch":
+									hotspot.RoomSwitch = e[0].ToString();
+									break;
+								case "set_virtual_room":
+									hotspot.VirtualRoom = e[0].ToString();
+									break;
+							}
+						}
+						Hotspots.Add(hotspot);
 					break;
 				case "flashlightset":
 					// TODO Room flashlightset
@@ -110,5 +150,12 @@ namespace LibreLancer.Compatibility.GameData.Universe
 				}
 			}
 		}
+	}
+	public class RoomHotspot
+	{
+		public string Name;
+		public string Behavior;
+		public string RoomSwitch;
+		public string VirtualRoom;
 	}
 }
